@@ -10,7 +10,7 @@ from typing import Sequence
 from .data_gap_checker import check_data_gaps, load_required_inputs
 from .file_classifier import FileClassifier
 from .file_inventory import inventory_files, verify_integrity
-from .logging_config import configure_logging
+from .logging_config import close_logging, configure_logging
 from .models import GapRecord, InventoryRecord
 from .project_setup import validate_paths
 from .reporting import write_csv, write_json, write_xlsx_if_available
@@ -54,6 +54,7 @@ def run_inventory(args: argparse.Namespace) -> dict[str, object]:
     }
     if args.dry_run:
         logger.info("Dry run complete: %d files; no output files or folders written", len(records))
+        close_logging(logger)
         return summary
     inventory_rows = [record.to_dict() for record in records]
     gap_rows = [gap.to_dict() for gap in gaps]
@@ -72,6 +73,7 @@ def run_inventory(args: argparse.Namespace) -> dict[str, object]:
     write_json(output / "project_summary.json", summary)
     write_json(output / "source_integrity_report.json", integrity)
     logger.info("Completed inventory: %d files; source integrity confirmed=%s", len(records), integrity["integrity_confirmed"])
+    close_logging(logger)
     return summary
 
 
