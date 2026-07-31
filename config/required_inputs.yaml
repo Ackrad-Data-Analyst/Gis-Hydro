@@ -1,0 +1,109 @@
+{
+  "draft_notice": "REVIEW REQUIRED: criticality is placeholder and requires Civil Engineering approval.",
+  "categories": [
+    {
+      "name": "Project boundary",
+      "required": true
+    },
+    {
+      "name": "Study area",
+      "required": true
+    },
+    {
+      "name": "Survey",
+      "required": false
+    },
+    {
+      "name": "DEM",
+      "required": true
+    },
+    {
+      "name": "LiDAR",
+      "required": false
+    },
+    {
+      "name": "Existing terrain",
+      "required": false
+    },
+    {
+      "name": "Proposed grading",
+      "required": false
+    },
+    {
+      "name": "Roads",
+      "required": false
+    },
+    {
+      "name": "Bridges",
+      "required": false
+    },
+    {
+      "name": "Culverts",
+      "required": false
+    },
+    {
+      "name": "Streams",
+      "required": false
+    },
+    {
+      "name": "Drainage paths",
+      "required": false
+    },
+    {
+      "name": "Watersheds",
+      "required": false
+    },
+    {
+      "name": "Soils",
+      "required": true
+    },
+    {
+      "name": "Hydrologic Soil Groups",
+      "required": false
+    },
+    {
+      "name": "Land cover",
+      "required": true
+    },
+    {
+      "name": "Rainfall",
+      "required": true
+    },
+    {
+      "name": "FEMA flood information",
+      "required": true
+    },
+    {
+      "name": "Wetlands",
+      "required": false
+    },
+    {
+      "name": "Aerial imagery",
+      "required": false
+    },
+    {
+      "name": "Existing hydrology reports",
+      "required": false
+    },
+    {
+      "name": "Drainage drawings",
+      "required": false
+    },
+    {
+      "name": "HEC RAS model",
+      "required": false
+    },
+    {
+      "name": "Other model files",
+      "required": false
+    },
+    {
+      "name": "Field photographs",
+      "required": false
+    },
+    {
+      "name": "As built drawings",
+      "required": false
+    }
+  ]
+}
