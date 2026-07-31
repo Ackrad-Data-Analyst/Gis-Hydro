@@ -56,3 +56,15 @@ class SourceCatalogTests(unittest.TestCase):
             ))
             self.assertTrue(summary["dry_run"])
             self.assertFalse(output.exists())
+
+    def test_plan_output_may_be_beside_boundary(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            boundary = make_kmz(root / "boundary.kmz")
+            output = root / "acquisition_plan"
+            summary = run_acquisition_plan(Namespace(
+                boundary=boundary, project_name="Generic Site", config=CONFIG,
+                output_folder=output, dry_run=False,
+            ))
+            self.assertEqual(summary["source_count"], 7)
+            self.assertTrue((output / "data_acquisition_plan.json").is_file())

@@ -18,3 +18,11 @@ class ClassifierTests(unittest.TestCase):
         value = r"C:\\Projects\\Cygnus\\site_DEM.TIFF"
         self.assertEqual(suffix_for_name(value), ".tiff")
         self.assertEqual(PureWindowsPath(value).name, "site_DEM.TIFF")
+    def test_keyword_substring_does_not_pass(self):
+        result = self.classifier.classify(Path("confirmation.pdf"))
+        self.assertNotEqual((result.category, result.status), ("FEMA flood information", "PASS"))
+    def test_configured_threshold_is_enforced(self):
+        config = load_json_yaml(CONFIG)
+        config["confidence_threshold"] = 0.99
+        result = FileClassifier(config).classify(Path("site_boundary.kmz"))
+        self.assertEqual((result.confidence, result.status), (0.95, "REVIEW"))

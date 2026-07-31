@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
@@ -40,7 +41,10 @@ class FileClassifier:
         extension = suffix_for_name(path.name)
         matches: list[tuple[int, str]] = []
         for rule in self.rules:
-            keyword_hits = sum(str(word).lower() in name for word in rule.get("keywords", []))
+            keyword_hits = sum(
+                bool(re.search(rf"(?<!\w){re.escape(str(word).lower())}(?!\w)", name))
+                for word in rule.get("keywords", [])
+            )
             extension_match = extension in rule.get("extensions", [])
             if keyword_hits and extension_match:
                 matches.append((keyword_hits, str(rule["category"])))
@@ -50,7 +54,15 @@ class FileClassifier:
             tied = [item for item in matches if item[0] == top_hits]
             if len(tied) > 1:
                 return Classification(category, 0.6, "REVIEW", "Multiple category rules matched; REVIEW REQUIRED.")
-            return Classification(category, 0.95, "PASS", "Filename and extension match a draft rule; engineering suitability remains REVIEW REQUIRED.")
+            confidence = 0.95
+            if confidence < self.threshold:
+                return Classification(
+                    category,
+                    confidence,
+                    "REVIEW",
+                    "Draft rule matched below the configured confidence threshold; REVIEW REQUIRED.",
+                )
+            return Classification(category, confidence, "PASS", "Filename and extension match a draft rule; engineering suitability remains REVIEW REQUIRED.")
         if extension in self.supported:
             return Classification("Unclassified", 0.2, "REVIEW", "Known format but category is uncertain; REVIEW REQUIRED.")
         return Classification("Unknown", 0.0, "REVIEW", "Unknown file extension and purpose; REVIEW REQUIRED.")

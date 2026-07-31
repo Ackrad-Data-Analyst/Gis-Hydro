@@ -12,7 +12,7 @@ from .file_classifier import FileClassifier
 from .file_inventory import inventory_files, verify_integrity
 from .logging_config import close_logging, configure_logging
 from .models import GapRecord, InventoryRecord
-from .project_setup import validate_paths
+from .project_setup import validate_file_output, validate_paths
 from .reporting import write_csv, write_json, write_xlsx_if_available
 from .source_register import SOURCE_COLUMNS, build_source_register
 from .source_catalog import AcquisitionPlanRecord, build_acquisition_plan, load_source_catalog
@@ -38,8 +38,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run_acquisition_plan(args: argparse.Namespace) -> dict[str, object]:
-    boundary = args.boundary.expanduser().resolve()
-    _, output = validate_paths(boundary.parent, args.output_folder)
+    boundary, output = validate_file_output(args.boundary, args.output_folder)
     config = args.config.expanduser().resolve()
     sources = load_source_catalog(config / "authoritative_sources.yaml")
     records = build_acquisition_plan(args.project_name, boundary, sources)
