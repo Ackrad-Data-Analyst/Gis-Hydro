@@ -1,6 +1,7 @@
-# Cygnus Preliminary Hydrology Workflow Automation Prototype
+# Site-Agnostic Preliminary Hydrology Workflow Automation
 
-Module 1 is a proof of concept for **project intake, read-only file inventory, source
+The application accepts a project name and boundary for **any site**; no site name is
+hard-coded. Cygnus is the first pilot only. Module 1 provides **project intake, read-only file inventory, source
 registration, and data-gap screening**. It does not perform engineering analysis or
 produce approved hydrology conclusions. Every configured rule is a draft requiring
 Civil Engineering review.
@@ -31,10 +32,10 @@ clearly record that Excel export was skipped. No package is installed automatica
 
 ```bash
 python -m hydro_workflow.cli inventory \
-  --project-folder "C:\Cygnus_Hydrology_Prototype\data\original" \
-  --project-name "Cygnus" \
+  --project-folder "C:\Site_Hydrology\Example_Site\data\original" \
+  --project-name "Example Site" \
   --config config \
-  --output-folder "C:\Cygnus_Hydrology_Prototype\outputs" \
+  --output-folder "C:\Site_Hydrology\Example_Site\outputs" \
   --verbose
 ```
 
@@ -42,7 +43,7 @@ Preview without creating an output folder or reports:
 
 ```bash
 python -m hydro_workflow.cli inventory --project-folder sample_data/synthetic_only \
-  --project-name Synthetic --config config --output-folder /tmp/cygnus-preview --dry-run
+  --project-name Synthetic --config config --output-folder /tmp/site-hydro-preview --dry-run
 ```
 
 For a source checkout without installation, prefix commands with `PYTHONPATH=src`
@@ -59,8 +60,38 @@ Normal runs produce `file_inventory.csv`, `source_register.csv`,
 `inventory_run.log`. Excel counterparts are optional as described above. See
 [`docs/user_guide.md`](docs/user_guide.md) for interpretation and limitations.
 
+## Authoritative data acquisition planning
+
+The manager-provided authoritative source catalog is stored in
+`config/authoritative_sources.yaml`. Build a site-specific, reviewable plan from any KMZ
+boundary with:
+
+```bash
+python -m hydro_workflow.cli plan-acquisition \
+  --boundary "C:\Projects\Example Site\boundary.kmz" \
+  --project-name "Example Site" --config config \
+  --output-folder "C:\Projects\Example Site\acquisition_plan"
+```
+
+This increment validates the catalog and writes CSV/JSON plus optional Excel plans. It
+does not yet download or process remote GIS layers. Source-specific download adapters,
+coverage checks, immutable download manifests, and GIS processing are the next module.
+
+## ArcGIS Pro toolbox
+
+`toolboxes/site_hydrology_workflow.pyt` is one toolbox for every ArcGIS Pro license
+level. Its **Preflight Environment Check** detects Basic, Standard, or Advanced plus
+Spatial Analyst, 3D Analyst, and Image Analyst availability. It writes an explicit
+capability matrix; unsupported operations fail closed rather than being silently skipped.
+
+In ArcGIS Pro, add a folder connection to the repository, expand `toolboxes`, open
+`Site Hydrology Workflow`, and run **Preflight Environment Check** before processing.
+The first toolbox increment only reports capabilities. Acquisition and processing tools
+will use this matrix as their mandatory licensing gate.
+
 ## Current scope
 
-Only Module 1 is implemented. Filename-based classification is intentionally
-conservative; CRS, units, datum, coverage, engineering suitability, and the provenance
-of unknown sources remain **REVIEW REQUIRED**.
+Module 1 inventory and the Module 2A acquisition-planning foundation are implemented.
+Remote download and GIS processing adapters are not implemented yet. Filename-based
+classification is intentionally conservative; CRS, units, datum, coverage, engineering
+suitability, and the provenance of unknown sources remain **REVIEW REQUIRED**.

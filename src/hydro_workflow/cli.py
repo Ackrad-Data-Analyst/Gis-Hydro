@@ -15,10 +15,11 @@ from .models import GapRecord, InventoryRecord
 from .project_setup import validate_paths
 from .reporting import write_csv, write_json, write_xlsx_if_available
 from .source_register import SOURCE_COLUMNS, build_source_register
+from .source_catalog import AcquisitionPlanRecord, build_acquisition_plan, load_source_catalog
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Cygnus read-only project intake prototype")
+    parser = argparse.ArgumentParser(description="Site-agnostic preliminary hydrology workflow")
     subparsers = parser.add_subparsers(dest="command", required=True)
     inventory = subparsers.add_parser("inventory", help="inventory a project folder")
     inventory.add_argument("--project-folder", required=True, type=Path)
@@ -27,7 +28,38 @@ def build_parser() -> argparse.ArgumentParser:
     inventory.add_argument("--output-folder", type=Path)
     inventory.add_argument("--dry-run", action="store_true")
     inventory.add_argument("--verbose", action="store_true")
+    plan = subparsers.add_parser("plan-acquisition", help="build a site-specific authoritative data acquisition plan")
+    plan.add_argument("--boundary", required=True, type=Path)
+    plan.add_argument("--project-name", required=True)
+    plan.add_argument("--config", type=Path, default=Path("config"))
+    plan.add_argument("--output-folder", required=True, type=Path)
+    plan.add_argument("--dry-run", action="store_true")
     return parser
+
+
+def run_acquisition_plan(args: argparse.Namespace) -> dict[str, object]:
+    boundary = args.boundary.expanduser().resolve()
+    _, output = validate_paths(boundary.parent, args.output_folder)
+    config = args.config.expanduser().resolve()
+    sources = load_source_catalog(config / "authoritative_sources.yaml")
+    records = build_acquisition_plan(args.project_name, boundary, sources)
+    summary: dict[str, object] = {
+        "project_name": args.project_name,
+        "boundary_file": str(boundary),
+        "source_count": len(records),
+        "dry_run": args.dry_run,
+        "status": "REVIEW",
+        "engineering_notice": "REVIEW REQUIRED: acquisition plan only; no data downloaded and no engineering suitability established.",
+    }
+    if args.dry_run:
+        return summary
+    output.mkdir(parents=True, exist_ok=True)
+    rows = [record.to_dict() for record in records]
+    columns = list(AcquisitionPlanRecord.__dataclass_fields__)
+    write_csv(output / "data_acquisition_plan.csv", rows, columns)
+    write_xlsx_if_available(output / "data_acquisition_plan.xlsx", rows, columns)
+    write_json(output / "data_acquisition_plan.json", {"summary": summary, "sources": rows})
+    return summary
 
 
 def run_inventory(args: argparse.Namespace) -> dict[str, object]:
@@ -81,10 +113,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        summary = run_inventory(args)
+        summary = run_inventory(args) if args.command == "inventory" else run_acquisition_plan(args)
     except (OSError, ValueError) as exc:
         parser.exit(2, f"error: {exc}\n")
-    print(f"Inventory complete: {summary['file_count']} files; integrity confirmed: {summary['integrity_confirmed']}")
+    if args.command == "inventory":
+        print(f"Inventory complete: {summary['file_count']} files; integrity confirmed: {summary['integrity_confirmed']}")
+    else:
+        print(f"Acquisition plan complete: {summary['source_count']} authoritative sources; status: {summary['status']}")
     return 0
 
 

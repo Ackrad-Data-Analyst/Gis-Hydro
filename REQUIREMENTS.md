@@ -12,3 +12,9 @@ and run log. CSV and JSON are mandatory. XLSX is conditional on an already avail
 The implementation must be cross-platform Python, typed and understandable, use
 synthetic tests, perform no network activity, and never write below the scanned source
 folder. Full acceptance tests are documented in `docs/test_plan.md`.
+
+The `plan-acquisition` command must accept any project name and KMZ boundary, validate
+`config/authoritative_sources.yaml`, and write a reviewable source plan without contacting
+remote services. The manager-provided catalog is configuration, not hard-coded Python.
+Network acquisition requires a later approved adapter with coverage, schema, CRS,
+licensing, metadata, retry, and download-integrity controls.

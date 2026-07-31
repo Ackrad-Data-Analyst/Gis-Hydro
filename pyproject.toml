@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "cygnus-hydrology-prototype"
+name = "site-hydrology-workflow"
 version = "0.1.0"
-description = "Read-only preliminary hydrology project intake prototype"
+description = "Site-agnostic preliminary hydrology workflow automation"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.scripts]
-cygnus-hydro = "hydro_workflow.cli:main"
+site-hydro = "hydro_workflow.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
