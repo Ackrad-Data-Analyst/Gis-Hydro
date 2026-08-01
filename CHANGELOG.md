@@ -1,5 +1,7 @@
 # Changelog
 
+- Simplified the ArcGIS Pro preflight dialog to input-only parameters to avoid a COM error when opening the Python toolbox in ArcGIS Pro 3.7.
+
 ## 0.2.0 - 2026-07-31
 
 - Generalized product naming and CLI descriptions for any site.

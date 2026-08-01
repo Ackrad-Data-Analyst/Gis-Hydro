@@ -52,21 +52,7 @@ class PreflightEnvironmentCheck:
             direction="Input",
         )
         add_table.value = True
-        report_json = arcpy.Parameter(
-            displayName="Preflight Report JSON",
-            name="preflight_report_json",
-            datatype="DEFile",
-            parameterType="Derived",
-            direction="Output",
-        )
-        report_csv = arcpy.Parameter(
-            displayName="Capability Matrix CSV",
-            name="capability_matrix_csv",
-            datatype="DEFile",
-            parameterType="Derived",
-            direction="Output",
-        )
-        return [output_folder, add_table, report_json, report_csv]
+        return [output_folder, add_table]
 
     def isLicensed(self):
         return True
@@ -130,8 +116,6 @@ class PreflightEnvironmentCheck:
             writer.writeheader()
             writer.writerows(result.to_dict() for result in capabilities)
 
-        parameters[2].value = str(json_path)
-        parameters[3].value = str(csv_path)
         arcpy.AddMessage(f"ArcGIS Pro version: {report['arcgis_pro_version']}")
         arcpy.AddMessage(f"License level: {license_level}")
         arcpy.AddMessage(f"Portal signed in: {signed_in}")
