@@ -134,8 +134,15 @@ def acquire_catalog_sources(
                 original_output = source_folder / f"{safe_name}.tif"
                 extent = arcpy_adapter.Describe(boundary).extent
                 rectangle = f"{extent.XMin} {extent.YMin} {extent.XMax} {extent.YMax}"
+                raster_input = source["rest_url"]
+                configured_filter = source.get("filter", "").strip()
+                if configured_filter:
+                    raster_input = f"{safe_name}_filtered_image"
+                    arcpy_adapter.management.MakeImageServerLayer(
+                        source["rest_url"], raster_input, configured_filter
+                    )
                 arcpy_adapter.management.Clip(
-                    source["rest_url"], rectangle, str(original_output), boundary,
+                    raster_input, rectangle, str(original_output), boundary,
                     "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
                 )
                 working_output = str(geodatabase / safe_name)

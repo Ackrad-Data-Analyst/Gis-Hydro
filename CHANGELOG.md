@@ -23,6 +23,8 @@
   a preliminary HEC-RAS review package, and consolidated QA/QC indexes.
 - Added an end-to-end orchestration function that connects workspace, boundary,
   acquisition, standardization, terrain, crossings, HEC-RAS review package, and QA stages.
+- Applied configured image-service filters to raster extraction layers and calculate
+  extent overlap only after data and boundary share the selected project CRS.
 
 ## 0.2.0 - 2026-07-31
 

@@ -102,13 +102,17 @@ def validate_standardize_data(project_root: Path, target_crs: Any, arcpy_adapter
         columns = int(getattr(description, "width", 0)) or None if is_raster else None
         cell_width = float(getattr(description, "meanCellWidth", 0)) or None if is_raster else None
         cell_height = float(getattr(description, "meanCellHeight", 0)) or None if is_raster else None
-        coverage = _coverage_percent(description.extent, boundary_extent)
         resampling = record.get("query_parameters", {}).get("resampling") or "NEAREST"
 
         if is_raster:
             arcpy_adapter.management.ProjectRaster(input_dataset, output, target_crs, resampling)
         else:
             arcpy_adapter.management.Project(input_dataset, output, target_crs)
+        # The standardized output and imported boundary now share the selected target CRS.
+        # Comparing native input coordinates with target-CRS boundary coordinates can
+        # produce meaningless overlap values.
+        standardized_description = arcpy_adapter.Describe(output)
+        coverage = _coverage_percent(standardized_description.extent, boundary_extent)
         results.append(StandardizationResult(
             source_name, input_dataset, output, data_type, feature_count, rows, columns,
             cell_width, cell_height, source_crs, target_name, coverage, resampling,

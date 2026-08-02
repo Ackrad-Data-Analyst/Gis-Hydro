@@ -10,6 +10,8 @@ from hydro_workflow.authoritative_acquisition import acquire_catalog_sources
 class _Management:
     def __init__(self, owner): self.owner = owner
     def MakeFeatureLayer(self, url, name, where): self.owner.layers.add(name)
+    def MakeImageServerLayer(self, url, name, where):
+        self.owner.layers.add(name); self.owner.image_filters[name] = where
     def SelectLayerByLocation(self, *args, **kwargs): return None
     def Clip(self, url, rectangle, output, *args): Path(output).write_bytes(b"synthetic raster")
     def CopyRaster(self, source, output): self.owner.outputs.add(output)
@@ -28,7 +30,7 @@ class _Analysis:
 
 class _ArcPy:
     def __init__(self):
-        self.layers, self.outputs = set(), set()
+        self.layers, self.outputs, self.image_filters = set(), set(), {}
         self.management, self.conversion, self.analysis = _Management(self), _Conversion(self), _Analysis(self)
     def Exists(self, value): return value == "boundary" or value in self.layers or value in self.outputs
     def Describe(self, value):
@@ -72,6 +74,14 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             self.assertEqual(len(list((root / "qa_qc").glob("acquisition_manifest_*.json"))), 1)
             self.assertTrue(Path(results[0].original_output).is_file())
             self.assertTrue(Path(results[1].original_output).is_file())
+
+    def test_raster_filter_is_applied_to_image_service_layer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root); adapter = _ArcPy()
+            source = _source("Annual_Land_Cover", "extract")
+            source["filter"] = "Year=2024"
+            acquire_catalog_sources(root, [source], adapter)
+            self.assertEqual(adapter.image_filters["Annual_Land_Cover_filtered_image"], "Year=2024")
 
     def test_existing_original_is_never_overwritten(self):
         with tempfile.TemporaryDirectory() as temp:

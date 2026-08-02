@@ -29,6 +29,19 @@ class _ArcPy:
             spatialReference=types.SimpleNamespace(name="Source CRS"))
 
 
+class _MixedCrsArcPy(_ArcPy):
+    def Describe(self, value):
+        if value in {"vector", "raster"}:
+            extent = types.SimpleNamespace(XMin=-112, YMin=33, XMax=-111, YMax=34)
+            if value == "raster":
+                return types.SimpleNamespace(dataType="RasterDataset", extent=extent,
+                    spatialReference=types.SimpleNamespace(name="Native Geographic CRS"), height=10,
+                    width=10, meanCellWidth=0.1, meanCellHeight=0.1)
+            return types.SimpleNamespace(dataType="FeatureClass", extent=extent,
+                spatialReference=types.SimpleNamespace(name="Native Geographic CRS"))
+        return super().Describe(value)
+
+
 def _project(root):
     gdb = root / "gis" / "site_hydrology.gdb"; gdb.mkdir(parents=True)
     qa = root / "qa_qc"; qa.mkdir()
@@ -62,6 +75,14 @@ class DataStandardizationTests(unittest.TestCase):
             root = Path(temp) / "site"; _project(root)
             with self.assertRaisesRegex(ValueError, "known target"):
                 validate_standardize_data(root, types.SimpleNamespace(name="Unknown"), _ArcPy())
+
+    def test_coverage_uses_projected_output_extent_not_native_coordinates(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            results = validate_standardize_data(
+                root, types.SimpleNamespace(name="Approved Project CRS"), _MixedCrsArcPy()
+            )
+            self.assertTrue(all(result.extent_coverage_percent == 100.0 for result in results))
 
 
 if __name__ == "__main__":
