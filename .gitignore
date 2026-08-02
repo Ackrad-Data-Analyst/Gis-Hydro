@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+outputs/*
+!outputs/README.md
+logs/*
+!logs/README.md
+data/original/*
+!data/original/README.md
+data/working/*
+!data/working/README.md
+sample_data/synthetic_only/demo_project/
+sample_data/synthetic_only/demo_outputs/
