@@ -1,0 +1,362 @@
+{
+  "draft_notice": "REVIEW REQUIRED: filename rules require Civil Engineering approval.",
+  "confidence_threshold": 0.8,
+  "rules": [
+    {
+      "category": "Project boundary",
+      "keywords": [
+        "boundary",
+        "footprint",
+        "project area"
+      ],
+      "extensions": [
+        ".kmz",
+        ".kml",
+        ".shp",
+        ".gpkg"
+      ]
+    },
+    {
+      "category": "Study area",
+      "keywords": [
+        "study area",
+        "aoi"
+      ],
+      "extensions": [
+        ".kmz",
+        ".kml",
+        ".shp",
+        ".gpkg"
+      ]
+    },
+    {
+      "category": "Survey",
+      "keywords": [
+        "survey",
+        "topo"
+      ],
+      "extensions": [
+        ".csv",
+        ".xlsx",
+        ".dwg",
+        ".dxf",
+        ".shp"
+      ]
+    },
+    {
+      "category": "DEM",
+      "keywords": [
+        "dem",
+        "elevation raster"
+      ],
+      "extensions": [
+        ".tif",
+        ".tiff",
+        ".hdf",
+        ".hdf5"
+      ]
+    },
+    {
+      "category": "LiDAR",
+      "keywords": [
+        "lidar",
+        "point cloud"
+      ],
+      "extensions": [
+        ".las",
+        ".laz"
+      ]
+    },
+    {
+      "category": "Existing terrain",
+      "keywords": [
+        "existing terrain",
+        "existing ground"
+      ],
+      "extensions": [
+        ".tif",
+        ".tiff",
+        ".dwg",
+        ".dxf"
+      ]
+    },
+    {
+      "category": "Proposed grading",
+      "keywords": [
+        "grading",
+        "proposed grade"
+      ],
+      "extensions": [
+        ".dwg",
+        ".dxf",
+        ".tif"
+      ]
+    },
+    {
+      "category": "Roads",
+      "keywords": [
+        "road",
+        "roads",
+        "highway"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".kml",
+        ".kmz",
+        ".dwg"
+      ]
+    },
+    {
+      "category": "Bridges",
+      "keywords": [
+        "bridge"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".csv",
+        ".dwg"
+      ]
+    },
+    {
+      "category": "Culverts",
+      "keywords": [
+        "culvert"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".csv",
+        ".xlsx",
+        ".dwg"
+      ]
+    },
+    {
+      "category": "Streams",
+      "keywords": [
+        "stream",
+        "river",
+        "nhd"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".kml"
+      ]
+    },
+    {
+      "category": "Drainage paths",
+      "keywords": [
+        "drainage path",
+        "flow path"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".kml"
+      ]
+    },
+    {
+      "category": "Watersheds",
+      "keywords": [
+        "watershed",
+        "basin",
+        "catchment"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".kml"
+      ]
+    },
+    {
+      "category": "Soils",
+      "keywords": [
+        "soil",
+        "ssurgo"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".csv"
+      ]
+    },
+    {
+      "category": "Hydrologic Soil Groups",
+      "keywords": [
+        "hydrologic soil",
+        "hsg"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".csv"
+      ]
+    },
+    {
+      "category": "Land cover",
+      "keywords": [
+        "land cover",
+        "nlcd"
+      ],
+      "extensions": [
+        ".tif",
+        ".tiff",
+        ".shp"
+      ]
+    },
+    {
+      "category": "Rainfall",
+      "keywords": [
+        "rainfall",
+        "precipitation",
+        "atlas 14"
+      ],
+      "extensions": [
+        ".csv",
+        ".xlsx",
+        ".pdf"
+      ]
+    },
+    {
+      "category": "FEMA flood information",
+      "keywords": [
+        "fema",
+        "floodplain",
+        "nfhl",
+        "firm"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".pdf"
+      ]
+    },
+    {
+      "category": "Wetlands",
+      "keywords": [
+        "wetland",
+        "nwi"
+      ],
+      "extensions": [
+        ".shp",
+        ".gpkg",
+        ".kml"
+      ]
+    },
+    {
+      "category": "Aerial imagery",
+      "keywords": [
+        "aerial",
+        "imagery",
+        "orthophoto"
+      ],
+      "extensions": [
+        ".tif",
+        ".tiff",
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ]
+    },
+    {
+      "category": "Existing hydrology reports",
+      "keywords": [
+        "hydrology report",
+        "drainage report"
+      ],
+      "extensions": [
+        ".pdf",
+        ".docx"
+      ]
+    },
+    {
+      "category": "Drainage drawings",
+      "keywords": [
+        "drainage drawing",
+        "drainage plan"
+      ],
+      "extensions": [
+        ".dwg",
+        ".dxf",
+        ".pdf"
+      ]
+    },
+    {
+      "category": "HEC RAS model",
+      "keywords": [
+        "hec ras",
+        "hecras"
+      ],
+      "extensions": [
+        ".prj",
+        ".p01",
+        ".g01",
+        ".f01",
+        ".hdf"
+      ]
+    },
+    {
+      "category": "Other model files",
+      "keywords": [
+        "model"
+      ],
+      "extensions": [
+        ".zip",
+        ".hdf",
+        ".hdf5"
+      ]
+    },
+    {
+      "category": "Field photographs",
+      "keywords": [
+        "field photo",
+        "site photo"
+      ],
+      "extensions": [
+        ".jpg",
+        ".jpeg",
+        ".png"
+      ]
+    },
+    {
+      "category": "As built drawings",
+      "keywords": [
+        "as built",
+        "as-built"
+      ],
+      "extensions": [
+        ".dwg",
+        ".dxf",
+        ".pdf"
+      ]
+    }
+  ],
+  "supported_extensions": [
+    ".kmz",
+    ".kml",
+    ".shp",
+    ".gpkg",
+    ".tif",
+    ".tiff",
+    ".las",
+    ".laz",
+    ".csv",
+    ".xlsx",
+    ".pdf",
+    ".docx",
+    ".dwg",
+    ".dxf",
+    ".hdf",
+    ".hdf5",
+    ".prj",
+    ".p01",
+    ".g01",
+    ".f01",
+    ".zip",
+    ".jpg",
+    ".jpeg",
+    ".png"
+  ]
+}
