@@ -6,7 +6,7 @@ Provide a reusable, boundary-driven workflow for any development site while pres
 traceability and engineering review. No site name is hard-coded. Cygnus is the first
 pilot, and company files must remain read-only and must not be committed to this repository.
 
-## This release: Module 1 and Module 2A planning foundation
+## Implemented workflow
 
 - Inventory files without changing them.
 - Infer likely categories from editable rules.
@@ -14,9 +14,16 @@ pilot, and company files must remain read-only and must not be committed to this
 - Report required and optional data gaps with PASS/REVIEW/FAIL screening states.
 - Inspect KMZ containers in memory and produce CSV/JSON plus optional Excel reports.
 - Validate an editable authoritative-source catalog and create a site-specific acquisition plan.
+- Create and validate a project workspace and polygon boundary.
+- Acquire configured ArcGIS vector and image-service data, preserve originals, and record provenance.
+- Standardize working GIS copies to an explicitly selected project coordinate system.
+- Run Spatial Analyst-gated flow, stream, drainage, and optional watershed candidate processing.
+- Screen road/drainage intersections and nearby supplied bridge or culvert records.
+- Build a preliminary HEC-RAS review package and consolidated QA/QC index.
+- Orchestrate the implemented stages through one complete-workflow ArcGIS tool.
 
 ## Explicitly excluded
 
-Remote-data downloads, terrain processing, watershed analysis, crossings, ArcGIS/ArcPy,
-imagery AI, HEC-RAS execution, dashboards, buildable-area calculations, and final design
-or approval are future work.
+HEC-RAS execution, automatic final geometry, imagery AI, dashboards, buildable-area
+calculations, calibration, final design, and engineering approval are excluded. Live
+service compatibility and engineering parameters require controlled workstation review.

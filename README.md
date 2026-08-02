@@ -89,9 +89,18 @@ In ArcGIS Pro, add a folder connection to the repository, expand `toolboxes`, op
 The first toolbox increment only reports capabilities. Acquisition and processing tools
 will use this matrix as their mandatory licensing gate.
 
+For a colleague who does not use GitHub, Git, or PowerShell, send a clean ZIP through the
+team's approved OneNote/Teams/SharePoint location and start with
+[`docs/manager_quick_start.md`](docs/manager_quick_start.md). The repository includes a
+double-click Windows launcher at `tools/Open Site Hydrology Toolbox.cmd`; it opens the
+correct toolbox folder and starts ArcGIS Pro without installing Python packages.
+
 ## Current scope
 
-Module 1 inventory and the Module 2A acquisition-planning foundation are implemented.
-Remote download and GIS processing adapters are not implemented yet. Filename-based
-classification is intentionally conservative; CRS, units, datum, coverage, engineering
-suitability, and the provenance of unknown sources remain **REVIEW REQUIRED**.
+The ArcGIS toolbox now connects workspace creation, boundary validation, catalog-driven
+acquisition, data standardization, Spatial Analyst terrain/drainage processing, crossing
+screening, preliminary HEC-RAS review-package export, and QA/QC reporting. It also exposes
+**Run Complete Preliminary Site Workflow**. Live services and native ArcGIS behavior must
+still be validated on the approved workstation. The package does not run HEC-RAS or make
+final engineering decisions. CRS, datum transformations, thresholds, structure data,
+model geometry, and engineering suitability remain **REVIEW REQUIRED**.

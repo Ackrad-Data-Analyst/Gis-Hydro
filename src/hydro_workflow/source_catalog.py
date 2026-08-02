@@ -17,6 +17,9 @@ REQUIRED_FIELDS = {
 ALLOWED_AUTHENTICATION = {"none", "arcgis_org"}
 ALLOWED_OPERATIONS = {"extract", "spatial_query_clip", "select_intersecting_copy"}
 
+# Catalog rows are intentionally not restricted to a fixed list of agencies or dataset
+# names. A team can add any number of reviewed sources using the supported operations.
+
 
 @dataclass(frozen=True)
 class AcquisitionPlanRecord:
