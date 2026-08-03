@@ -8,14 +8,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .authoritative_acquisition import acquire_catalog_sources
-from .boundary_validation import import_and_validate_boundary
+from .authoritative_acquisition import acquire_catalog_sources, stage_existing_map_sources
+from .boundary_validation import import_and_validate_boundary, import_kml_boundary
 from .crossing_screening import screen_crossings
 from .data_standardization import validate_standardize_data
 from .hec_ras_package import build_hec_ras_review_package
+from .hydrologic_response import combine_land_cover_soils
 from .project_workspace import create_project_workspace
 from .qa_package import generate_qa_package
 from .terrain_hydrology import prepare_terrain_hydrology
+from .kmz_inspector import list_kml_polygon_names
+from .workflow_preferences import unit_preferences
 
 
 @dataclass(frozen=True)
@@ -51,12 +54,56 @@ def run_complete_workflow(
     pour_points: str | None = None,
     snap_distance: float | None = None,
     land_cover_source_name: str | None = None,
+    boundary_polygon_name: str | None = None,
+    unit_system: str = "Imperial",
+    soil_group_source_name: str | None = None,
+    existing_map_sources: dict[str, str] | None = None,
 ) -> CompleteWorkflowResult:
     """Run all implemented operations and stop at the first unsafe condition."""
+    units = unit_preferences(unit_system)
     workspace = create_project_workspace(project_name, projects_root, arcpy_adapter)
     root = Path(workspace.project_root)
-    boundary_result = import_and_validate_boundary(boundary, root, arcpy_adapter, target_crs)
-    acquired = acquire_catalog_sources(root, sources, arcpy_adapter)
+    boundary_path = Path(boundary)
+    if boundary_path.suffix.lower() in {".kml", ".kmz"}:
+        polygon_names = list_kml_polygon_names(boundary_path)
+        selected_name = boundary_polygon_name
+        if not selected_name:
+            preferred = [
+                name for name in polygon_names
+                if "boundary" in name.lower()
+                and not any(token in name.lower() for token in ("row", "right of way", "corridor"))
+            ]
+            if len(polygon_names) == 1:
+                selected_name = polygon_names[0]
+            elif len(preferred) == 1:
+                selected_name = preferred[0]
+            else:
+                raise ValueError(
+                    "Select the project boundary polygon from the KMZ. Available names: "
+                    + ", ".join(polygon_names)
+                )
+        _, boundary_result = import_kml_boundary(
+            boundary_path, root, arcpy_adapter, selected_name, target_crs, polygon_names
+        )
+    else:
+        boundary_result = import_and_validate_boundary(boundary, root, arcpy_adapter, target_crs)
+
+    (root / "qa_qc" / "workflow_preferences.json").write_text(
+        json.dumps({
+            "unit_system": units.name,
+            "horizontal_distance": units.horizontal_distance,
+            "elevation": units.elevation,
+            "area": units.area,
+            "rainfall": units.rainfall,
+            "soil_group_policy": "Dual or mixed hydrologic soil groups are screened as D; REVIEW REQUIRED.",
+        }, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    acquired = (
+        stage_existing_map_sources(root, existing_map_sources, arcpy_adapter)
+        if existing_map_sources
+        else acquire_catalog_sources(root, sources, arcpy_adapter)
+    )
     failures = [item.source_name for item in acquired if item.status == "FAIL"]
     if failures: raise RuntimeError(f"Acquisition failed for: {', '.join(failures)}")
     standardized = validate_standardize_data(root, target_crs, arcpy_adapter)
@@ -76,6 +123,14 @@ def run_complete_workflow(
         by_name.get(culverts_source_name) if culverts_source_name else None,
         structure_search_distance,
     )
+    response_units = None
+    if land_cover_source_name and soil_group_source_name:
+        land_cover_dataset = by_name.get(land_cover_source_name)
+        soil_group_dataset = by_name.get(soil_group_source_name)
+        if land_cover_dataset and soil_group_dataset:
+            response_units = combine_land_cover_soils(
+                root, land_cover_dataset, soil_group_dataset, arcpy_adapter
+            ).combined_raster
     hec = build_hec_ras_review_package(
         root, terrain.filled_dem or by_name[dem_source_name], arcpy_adapter,
         {
@@ -84,7 +139,7 @@ def run_complete_workflow(
             "flow_paths": terrain.drainage_paths,
             "cross_sections": None,
             "crossings": crossings.screened_crossings,
-            "land_cover": by_name.get(land_cover_source_name) if land_cover_source_name else None,
+            "land_cover": response_units or (by_name.get(land_cover_source_name) if land_cover_source_name else None),
         },
     )
     qa_json, _ = generate_qa_package(root)

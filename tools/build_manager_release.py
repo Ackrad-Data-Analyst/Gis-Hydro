@@ -25,6 +25,11 @@ def _personalized_message(manager: str, author: str) -> str:
     return template.replace("[Manager Name]", manager).replace("[Your Name]", author)
 
 
+def _feedback_response(manager: str, author: str) -> str:
+    template = (ROOT / "docs" / "response_to_adolfo_feedback.md").read_text(encoding="utf-8")
+    return template.replace("[Manager Name]", manager).replace("[Your Name]", author)
+
+
 def _plain_lines(markdown: str) -> list[str]:
     lines: list[str] = []
     for raw in markdown.splitlines():
@@ -97,15 +102,20 @@ def _release_files() -> list[Path]:
     return sorted({path for path in files if "__pycache__" not in path.parts and not path.name.endswith(EXCLUDED_SUFFIXES)})
 
 
-def build_release(manager: str, author: str, output_directory: Path) -> tuple[Path, Path, Path]:
+def build_release(manager: str, author: str, output_directory: Path) -> tuple[Path, Path, Path, Path, Path]:
     safe_manager = re.sub(r"[^A-Za-z0-9]+", "_", manager).strip("_")
     markdown = _personalized_message(manager, author)
     message_path = output_directory / f"Manager_Submission_{safe_manager}.md"
     pdf_path = output_directory / f"Manager_Submission_{safe_manager}.pdf"
     zip_path = output_directory / f"Gis-Hydro_Manager_Release_{safe_manager}.zip"
+    feedback_message_path = output_directory / f"Feedback_Response_{safe_manager}.md"
+    feedback_pdf_path = output_directory / f"Feedback_Response_{safe_manager}.pdf"
     output_directory.mkdir(parents=True, exist_ok=True)
     message_path.write_text(markdown, encoding="utf-8")
     write_pdf(markdown, pdf_path)
+    feedback = _feedback_response(manager, author)
+    feedback_message_path.write_text(feedback, encoding="utf-8")
+    write_pdf(feedback, feedback_pdf_path)
     manifest: list[str] = []
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in _release_files():
@@ -113,8 +123,9 @@ def build_release(manager: str, author: str, output_directory: Path) -> tuple[Pa
             archive.write(path, Path("Gis-Hydro") / relative)
             manifest.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  Gis-Hydro/{relative.as_posix()}")
         archive.write(pdf_path, Path("Gis-Hydro") / "Manager_Submission.pdf")
+        archive.write(feedback_pdf_path, Path("Gis-Hydro") / "Feedback_Response.pdf")
         archive.writestr("Gis-Hydro/RELEASE_SHA256.txt", "\n".join(manifest) + "\n")
-    return message_path, pdf_path, zip_path
+    return message_path, pdf_path, feedback_message_path, feedback_pdf_path, zip_path
 
 
 def main() -> None:

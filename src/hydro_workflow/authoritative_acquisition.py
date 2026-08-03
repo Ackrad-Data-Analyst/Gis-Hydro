@@ -213,3 +213,42 @@ def acquire_catalog_sources(
         encoding="utf-8",
     )
     return results
+
+
+def stage_existing_map_sources(
+    project_root: Path,
+    layer_roles: dict[str, str],
+    arcpy_adapter: Any,
+) -> list[AcquisitionResult]:
+    """Snapshot explicitly selected map layers so they can replace network acquisition.
+
+    Map symbology is not treated as provenance. Each selected dataset is copied to the
+    project geodatabase and recorded in the same manifest used by standardization.
+    """
+    root, geodatabase, boundary = _load_workspace(project_root)
+    requested_at = datetime.now(timezone.utc).isoformat()
+    results: list[AcquisitionResult] = []
+    for source_name, dataset in layer_roles.items():
+        safe_name = _safe_name(source_name)
+        output = str(geodatabase / safe_name)
+        if arcpy_adapter.Exists(output):
+            raise FileExistsError(f"Staged map dataset exists and will not be overwritten: {output}")
+        description = arcpy_adapter.Describe(dataset)
+        data_type = str(getattr(description, "dataType", ""))
+        if "raster" in data_type.lower():
+            arcpy_adapter.management.CopyRaster(dataset, output)
+        else:
+            arcpy_adapter.analysis.Clip(dataset, boundary, output)
+        crs, resolution = _describe_output(arcpy_adapter, output)
+        results.append(AcquisitionResult(
+            source_name=source_name, category="Existing approved map layer",
+            agency="Supplied ArcGIS map", service_url=str(dataset), operation="snapshot_from_map",
+            requested_at=requested_at, completed_at=datetime.now(timezone.utc).isoformat(),
+            query_parameters={"boundary": boundary, "selection": "explicit operator layer role"},
+            original_output=None, working_output=output, sha256=None, coordinate_system=crs,
+            resolution_or_scale=resolution, coverage="CLIPPED_OR_COPIED_FOR_PROJECT", status="REVIEW",
+            message="Map layer snapshot completed; ownership, currency, license, and engineering suitability are REVIEW REQUIRED.",
+        ))
+    report = root / "qa_qc" / f"acquisition_manifest_{requested_at.replace(':', '').replace('+', '_')}.json"
+    report.write_text(json.dumps([item.to_dict() for item in results], indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return results

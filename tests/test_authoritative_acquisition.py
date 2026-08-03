@@ -4,7 +4,7 @@ import types
 import unittest
 from pathlib import Path
 
-from hydro_workflow.authoritative_acquisition import acquire_catalog_sources
+from hydro_workflow.authoritative_acquisition import acquire_catalog_sources, stage_existing_map_sources
 
 
 class _Management:
@@ -37,6 +37,7 @@ class _ArcPy:
         return types.SimpleNamespace(
             extent=types.SimpleNamespace(XMin=0, YMin=0, XMax=10, YMax=10),
             spatialReference=types.SimpleNamespace(name="Synthetic CRS"), meanCellWidth=1, meanCellHeight=1,
+            dataType="RasterDataset" if "dem" in str(value).lower() else "FeatureClass",
         )
 
 
@@ -113,6 +114,18 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             root = Path(temp) / "site"; _project(root)
             result = acquire_catalog_sources(root, [_source("Vector", "spatial_query_clip")], _ArcPy())[0]
             self.assertEqual(Path(result.original_output).suffix, ".geojson")
+
+    def test_existing_map_layers_replace_network_acquisition_with_snapshots(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            adapter = _ArcPy()
+            results = stage_existing_map_sources(
+                root, {"USGS_3DEP_DEM": "approved_dem", "USGS_TNM_Roads": "approved_roads"}, adapter
+            )
+            self.assertEqual(len(results), 2)
+            self.assertTrue(all(item.operation == "snapshot_from_map" for item in results))
+            self.assertTrue(all(item.status == "REVIEW" for item in results))
+            self.assertEqual(len(list((root / "qa_qc").glob("acquisition_manifest_*.json"))), 1)
 
 
 if __name__ == "__main__":

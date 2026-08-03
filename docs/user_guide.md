@@ -32,7 +32,16 @@ without adding dependencies:
 
 ## Complete preliminary workflow
 
-Run categories in numerical order. Do not rerun a completed stage over existing outputs.
+For a normal new site, run **00 - START HERE > Automated Site Workflow - KMZ to Review
+Package**. In one dialog, choose the project name, parent projects folder, KML/KMZ,
+boundary polygon name, approved CRS, Imperial/Metric units, reviewed stream threshold,
+fill choice, and data mode. **Authoritative Catalog** clips configured services;
+**Existing Map Layers** snapshots the DEM/roads and optional land-cover/soil layers you
+explicitly select from the current ArcGIS map. The automated tool creates the project file
+geodatabase and all implemented downstream review outputs.
+
+The individual tools below remain available for troubleshooting or controlled reruns.
+Do not rerun a completed stage over existing outputs.
 
 1. **00 - Preflight:** record product and extension availability.
 2. **01 - Create Project Workspace:** provide a project name and projects root.

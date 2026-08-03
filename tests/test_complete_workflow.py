@@ -31,6 +31,8 @@ class CompleteWorkflowTests(unittest.TestCase):
             self.assertEqual(result.status, "REVIEW")
             self.assertEqual(result.acquired_sources, 2)
             terrain.assert_called_once(); crossings.assert_called_once(); hec.assert_called_once(); qa.assert_called_once()
+            preferences = (root / "qa_qc" / "workflow_preferences.json").read_text()
+            self.assertIn('"unit_system": "Imperial"', preferences)
 
 
 if __name__ == "__main__": unittest.main()

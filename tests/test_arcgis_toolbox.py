@@ -48,7 +48,11 @@ class ArcGISToolboxTests(unittest.TestCase):
         parameters = module.CreateProjectWorkspace().getParameterInfo()
 
         self.assertIn(module.CreateProjectWorkspace, toolbox.tools)
-        self.assertEqual([parameter.name for parameter in parameters], ["project_name", "output_root"])
+        self.assertEqual(
+            [parameter.name for parameter in parameters],
+            ["project_name", "output_root", "created_geodatabase"],
+        )
+        self.assertEqual(parameters[2].direction, "Output")
 
     def test_boundary_tool_requires_boundary_and_workspace(self):
         fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
@@ -60,7 +64,7 @@ class ArcGISToolboxTests(unittest.TestCase):
             loader.exec_module(module)
 
         parameters = module.ImportValidateBoundary().getParameterInfo()
-        self.assertIn(module.ImportValidateBoundary, module.Toolbox().tools)
+        self.assertNotIn(module.ImportValidateBoundary, module.Toolbox().tools)
         self.assertEqual(
             [parameter.name for parameter in parameters],
             ["boundary", "project_root", "target_crs", "add_to_map"],
@@ -148,6 +152,28 @@ class ArcGISToolboxTests(unittest.TestCase):
         ])
         self.assertEqual(parameters[2].parameterType, "Required")
         self.assertEqual(parameters[3].parameterType, "Required")
+
+    def test_automated_workflow_is_first_and_accepts_kmz_units_and_one_run_inputs(self):
+        fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_automated_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+
+        toolbox = module.Toolbox()
+        parameters = module.RunCompleteSiteWorkflow().getParameterInfo()
+        self.assertIs(toolbox.tools[0], module.RunCompleteSiteWorkflow)
+        self.assertEqual([parameter.name for parameter in parameters], [
+            "project_name", "projects_root", "boundary", "boundary_polygon_name",
+            "target_crs", "unit_system", "data_source_mode", "map_dem", "map_roads",
+            "map_land_cover", "map_soils", "stream_threshold_cells", "fill_dem",
+            "source_catalog", "add_to_map",
+        ])
+        self.assertEqual(parameters[2].filter.list, ["kml", "kmz"])
+        self.assertEqual(parameters[5].filter.list, ["Imperial", "Metric"])
+        self.assertEqual(parameters[6].filter.list, ["Authoritative Catalog", "Existing Map Layers"])
 
 
 if __name__ == "__main__":

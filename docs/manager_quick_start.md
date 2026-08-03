@@ -62,21 +62,24 @@ The first time ArcGIS Pro sees the toolbox, it may show a red exclamation mark. 
 that on my workstation by right-clicking `site_hydrology_workflow.pyt`, selecting
 **Refresh Python Toolbox Access Permission**, and then selecting **Refresh**.
 
-## Run the same preflight I ran
+## Run preflight before the automated workflow
 
-1. Open **00 - Environment and QA**.
-2. Double-click **Preflight Environment Check**.
-3. Choose a local output folder outside this repository. For example:
+1. Double-click **Preflight Environment Check**.
+2. Choose a local output folder outside this repository. For example:
 
    `C:\Site_Hydrology\Preflight`
 
-4. Leave **Add Capability Table to Current Map** checked.
-5. Select **Run**.
+3. Leave **Add Capability Table to Current Map** checked.
+4. Select **Run**.
 
 ![Preflight tool inputs](images/03_run_preflight.svg)
 
 The run creates `arcgis_preflight_report.json` and
 `arcgis_capability_matrix.csv`. The CSV is also added to the map as a standalone table.
+
+ArcGIS Pro **Advanced** does not automatically include **Spatial Analyst**. Confirm that
+the capability report shows `terrain_hydrology=AVAILABLE`. If it does not, request that the
+ArcGIS Online administrator assign Spatial Analyst before running terrain processing.
 
 ![Completed run and capability table](images/04_review_results.svg)
 
@@ -89,6 +92,20 @@ The run creates `arcgis_preflight_report.json` and
   Image Analyst. The preflight checks each extension separately.
 - A different team member can use the same toolbox. They will see the functions allowed
   by their own ArcGIS license.
+
+## Run the normal one-dialog workflow
+
+1. Open **00 - START HERE**.
+2. Double-click **Automated Site Workflow - KMZ to Review Package**.
+3. Enter a project name and select the **parent** projects folder. The tool creates the
+   named project folder and `gis\site_hydrology.gdb`.
+4. Select the KML/KMZ and choose the project polygon from the populated dropdown.
+5. Select the approved CRS and Imperial or Metric units.
+6. Choose **Existing Map Layers** to reuse the approved DEM/roads and optional land-cover/
+   soil layers already in the map, or **Authoritative Catalog** to acquire configured data.
+7. Enter the reviewed stream threshold and fill choice, then run once.
+8. Review the elevation and transparent boundary outline in the map and retain the project
+   `qa_qc` folder as the traceable run record.
 
 The capability rules are in `config\arcgis_capabilities.yaml`. Any change to a licensing
 or engineering rule is **REVIEW REQUIRED** before team rollout.

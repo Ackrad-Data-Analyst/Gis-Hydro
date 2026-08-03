@@ -36,69 +36,126 @@ class Toolbox:
         self.label = "Site Hydrology Workflow"
         self.alias = "site_hydrology"
         self.tools = [
+            RunCompleteSiteWorkflow,
             PreflightEnvironmentCheck,
             CreateProjectWorkspace,
             PrepareKmlBoundaryCandidates,
-            ImportValidateBoundary,
             DownloadAuthoritativeData,
             ValidateStandardizeData,
             PrepareTerrainDrainage,
             ScreenRoadsCrossings,
             PrepareHecRasPackage,
             GenerateQaPackage,
-            RunCompleteSiteWorkflow,
         ]
 
 
 class RunCompleteSiteWorkflow:
     def __init__(self):
-        self.label = "Run Complete Preliminary Site Workflow"; self.category = "08 - Complete Workflow"; self.canRunInBackground = False
+        self.label = "Automated Site Workflow - KMZ to Review Package"
+        self.description = "Create the geodatabase, import the named KMZ polygon, acquire and standardize data, run terrain/crossing screening, and package QA in one run."
+        self.category = "00 - START HERE"
+        self.canRunInBackground = False
     def getParameterInfo(self):
         specs = [
             ("Project Name", "project_name", "GPString", "Required"),
-            ("Projects Root Folder", "projects_root", "DEFolder", "Required"),
-            ("Project Boundary", "boundary", "GPFeatureLayer", "Required"),
+            ("Parent Folder for Projects (a project folder and geodatabase will be created)", "projects_root", "DEFolder", "Required"),
+            ("Project Boundary KML or KMZ", "boundary", "DEFile", "Required"),
+            ("Project Boundary Polygon Name", "boundary_polygon_name", "GPString", "Optional"),
             ("Approved Project Coordinate System", "target_crs", "GPCoordinateSystem", "Required"),
+            ("Output Unit System", "unit_system", "GPString", "Required"),
+            ("Data Source Mode", "data_source_mode", "GPString", "Required"),
+            ("Existing Map DEM (required only for Existing Map mode)", "map_dem", "GPRasterLayer", "Optional"),
+            ("Existing Map Roads (required only for Existing Map mode)", "map_roads", "GPFeatureLayer", "Optional"),
+            ("Existing Map Land Cover (optional)", "map_land_cover", "GPRasterLayer", "Optional"),
+            ("Existing Map Hydrologic Soil Groups (optional)", "map_soils", "GPRasterLayer", "Optional"),
+            ("Stream Threshold (Contributing Cells; REVIEW REQUIRED)", "stream_threshold_cells", "GPLong", "Required"),
+            ("Fill Depressions (REVIEW REQUIRED)", "fill_dem", "GPBoolean", "Required"),
             ("Authoritative Source Catalog", "source_catalog", "DEFile", "Required"),
-            ("DEM Source Name", "dem_source_name", "GPString", "Required"),
-            ("Road Source Name", "roads_source_name", "GPString", "Required"),
-            ("Stream Threshold (Contributing Cells)", "stream_threshold_cells", "GPLong", "Required"),
-            ("Fill Depressions", "fill_dem", "GPBoolean", "Required"),
-            ("Bridge Source Name (Optional)", "bridges_source_name", "GPString", "Optional"),
-            ("Culvert Source Name (Optional)", "culverts_source_name", "GPString", "Optional"),
-            ("Known Structure Search Distance", "structure_search_distance", "GPLinearUnit", "Optional"),
-            ("Pour Points (Optional)", "pour_points", "GPFeatureLayer", "Optional"),
-            ("Pour Point Snap Distance", "snap_distance", "GPDouble", "Optional"),
-            ("Land Cover Source Name (Optional)", "land_cover_source_name", "GPString", "Optional"),
+            ("Add Elevation and Boundary Outline to Current Map", "add_to_map", "GPBoolean", "Required"),
         ]
         parameters = [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
-        parameters[4].value = str(REPOSITORY_ROOT / "config" / "authoritative_sources.yaml")
+        parameters[2].filter.list = ["kml", "kmz"]
+        parameters[5].filter.list = ["Imperial", "Metric"]
+        parameters[5].value = "Imperial"
+        parameters[6].filter.list = ["Authoritative Catalog", "Existing Map Layers"]
+        parameters[6].value = "Authoritative Catalog"
+        parameters[12].value = True
+        parameters[13].value = str(REPOSITORY_ROOT / "config" / "authoritative_sources.yaml")
+        parameters[14].value = True
         return parameters
     def isLicensed(self): return arcpy.CheckExtension("Spatial") in {"Available", "CheckedOut"}
     def updateParameters(self, parameters):
-        catalog_text = parameters[4].valueAsText
-        if catalog_text and Path(catalog_text).is_file():
+        source_text = parameters[2].valueAsText
+        if source_text and Path(source_text).is_file():
             try:
-                names = [row["name"] for row in load_source_catalog(Path(catalog_text))]
-                for index in (5, 6, 9, 10, 14): parameters[index].filter.list = names
-            except (ValueError, OSError): pass
+                names = list_kml_polygon_names(Path(source_text))
+                parameters[3].filter.list = names
+                if not parameters[3].valueAsText:
+                    preferred = [name for name in names if "boundary" in name.lower() and "row" not in name.lower()]
+                    if len(names) == 1: parameters[3].value = names[0]
+                    elif len(preferred) == 1: parameters[3].value = preferred[0]
+            except ValueError:
+                pass
+        use_map = parameters[6].valueAsText == "Existing Map Layers"
+        for index in (7, 8, 9, 10):
+            parameters[index].enabled = use_map
+        parameters[13].enabled = not use_map
     def updateMessages(self, parameters):
-        if (parameters[9].valueAsText or parameters[10].valueAsText) and not parameters[11].valueAsText:
-            parameters[11].setErrorMessage("Search distance is required with known structures.")
-        if parameters[12].valueAsText and parameters[13].value is None:
-            parameters[13].setErrorMessage("Snap distance is required with pour points.")
+        source_text = parameters[2].valueAsText
+        if source_text and Path(source_text).is_file():
+            try:
+                names = list_kml_polygon_names(Path(source_text))
+                if len(names) > 1 and not parameters[3].valueAsText:
+                    parameters[3].setErrorMessage("Choose the project boundary polygon; ROW/corridor polygons are not the site boundary.")
+            except ValueError as exc:
+                parameters[2].setErrorMessage(str(exc))
+        if parameters[6].valueAsText == "Existing Map Layers":
+            if not parameters[7].valueAsText:
+                parameters[7].setErrorMessage("Select the approved DEM layer from the current map.")
+            if not parameters[8].valueAsText:
+                parameters[8].setErrorMessage("Select the approved road layer from the current map.")
     def execute(self, parameters, messages):
-        sources = load_source_catalog(Path(parameters[4].valueAsText))
+        use_map = parameters[6].valueAsText == "Existing Map Layers"
+        sources = [] if use_map else load_source_catalog(Path(parameters[13].valueAsText))
+        map_sources = None
+        if use_map:
+            map_sources = {
+                "USGS_3DEP_DEM": parameters[7].valueAsText,
+                "USGS_TNM_Roads": parameters[8].valueAsText,
+            }
+            if parameters[9].valueAsText:
+                map_sources["NLCD_Land_Cover"] = parameters[9].valueAsText
+            if parameters[10].valueAsText:
+                map_sources["SSURGO_Hydrologic_Group"] = parameters[10].valueAsText
         result = run_complete_workflow(
             parameters[0].valueAsText, Path(parameters[1].valueAsText), parameters[2].valueAsText,
-            parameters[3].value, sources, parameters[5].valueAsText, parameters[6].valueAsText,
-            int(parameters[7].value), bool(parameters[8].value), arcpy,
-            parameters[9].valueAsText or None, parameters[10].valueAsText or None,
-            parameters[11].valueAsText or None, parameters[12].valueAsText or None,
-            float(parameters[13].value) if parameters[13].value is not None else None,
-            parameters[14].valueAsText or None,
+            parameters[4].value, sources, "USGS_3DEP_DEM", "USGS_TNM_Roads",
+            int(parameters[11].value), bool(parameters[12].value), arcpy,
+            land_cover_source_name="NLCD_Land_Cover",
+            boundary_polygon_name=parameters[3].valueAsText or None,
+            unit_system=parameters[5].valueAsText,
+            soil_group_source_name="SSURGO_Hydrologic_Group",
+            existing_map_sources=map_sources,
         )
         arcpy.AddMessage(f"Complete workflow outputs: {result.project_root}")
+        if bool(parameters[14].value):
+            project = arcpy.mp.ArcGISProject("CURRENT")
+            active_map = project.activeMap
+            if active_map is not None:
+                terrain_report = json.loads(Path(result.terrain_report).read_text(encoding="utf-8"))
+                elevation = terrain_report.get("filled_dem") or terrain_report["input_dem"]
+                active_map.addDataFromPath(elevation)
+                boundary_layer = active_map.addDataFromPath(result.boundary)
+                try:
+                    symbology = boundary_layer.symbology
+                    symbol = symbology.renderer.symbol
+                    symbol.color = {"RGB": [255, 255, 255, 0]}
+                    symbol.outlineColor = {"RGB": [255, 0, 0, 100]}
+                    symbol.outlineWidth = 2
+                    symbology.renderer.symbol = symbol
+                    boundary_layer.symbology = symbology
+                except (AttributeError, RuntimeError):
+                    arcpy.AddWarning("Boundary was added, but ArcGIS could not apply transparent-fill outline symbology.")
         arcpy.AddWarning(result.review_notes)
 
 
@@ -404,7 +461,7 @@ class PrepareKmlBoundaryCandidates:
             direction="Input",
         )
         boundary_name = arcpy.Parameter(
-            displayName="Boundary Name Contains (for example: Project Boundary)",
+            displayName="Project Boundary Polygon Name (choose the site polygon, not ROW/corridor)",
             name="boundary_name_contains",
             datatype="GPString",
             parameterType="Required",
@@ -497,13 +554,17 @@ class CreateProjectWorkspace:
             direction="Input",
         )
         output_root = arcpy.Parameter(
-            displayName="Projects Root Folder",
+            displayName="Parent Folder for Projects (a named project folder and geodatabase will be created)",
             name="output_root",
             datatype="DEFolder",
             parameterType="Required",
             direction="Input",
         )
-        return [project_name, output_root]
+        geodatabase = arcpy.Parameter(
+            displayName="Created Project Geodatabase", name="created_geodatabase",
+            datatype="DEWorkspace", parameterType="Derived", direction="Output",
+        )
+        return [project_name, output_root, geodatabase]
 
     def isLicensed(self):
         return arcpy.ProductInfo() not in {"NotInitialized", "Unavailable"}
@@ -522,6 +583,7 @@ class CreateProjectWorkspace:
         )
         arcpy.AddMessage(f"Created project workspace: {manifest.project_root}")
         arcpy.AddMessage(f"Created project geodatabase: {manifest.geodatabase}")
+        parameters[2].value = manifest.geodatabase
         arcpy.AddWarning(manifest.engineering_notice)
 
 

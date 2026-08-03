@@ -1,5 +1,16 @@
 # Changelog
 
+## Manager UX consolidation
+
+- Added a KMZ-first automated workflow as the first toolbox entry, reducing the normal run
+  to one dialog while retaining advanced troubleshooting tools.
+- Clarified parent-folder/geodatabase behavior and returned the created geodatabase.
+- Replaced ambiguous boundary-name wording with a KMZ polygon dropdown and hid the redundant
+  generic boundary importer.
+- Added Imperial/Metric workflow preferences and transparent boundary-outline map display.
+- Added conservative dual/mixed soil-group normalization and an approval-gated engineering
+  lookup template rather than embedding unreviewed CN, roughness, or infiltration values.
+
 ## 0.3.3 - 2026-08-03
 
 - Added a configurable federal USGS National Map road-centerline source for nationwide

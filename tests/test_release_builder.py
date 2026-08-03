@@ -16,13 +16,19 @@ class ReleaseBuilderTests(unittest.TestCase):
 
     def test_personalized_pdf_and_clean_zip_are_created(self):
         with tempfile.TemporaryDirectory() as folder:
-            message, pdf, archive_path = build_release("Manager Example", "Author Example", Path(folder))
+            message, pdf, feedback_message, feedback_pdf, archive_path = build_release(
+                "Manager Example", "Author Example", Path(folder)
+            )
             self.assertIn("Hi Manager Example", message.read_text(encoding="utf-8"))
             self.assertIn("Author Example", message.read_text(encoding="utf-8"))
             self.assertTrue(pdf.read_bytes().startswith(b"%PDF-1.4"))
+            self.assertIn("Hi Manager Example", feedback_message.read_text(encoding="utf-8"))
+            self.assertIn("Author Example", feedback_message.read_text(encoding="utf-8"))
+            self.assertTrue(feedback_pdf.read_bytes().startswith(b"%PDF-1.4"))
             with zipfile.ZipFile(archive_path) as archive:
                 names = archive.namelist()
                 self.assertIn("Gis-Hydro/Manager_Submission.pdf", names)
+                self.assertIn("Gis-Hydro/Feedback_Response.pdf", names)
                 self.assertIn("Gis-Hydro/RELEASE_SHA256.txt", names)
                 self.assertIn("Gis-Hydro/toolboxes/site_hydrology_workflow.pyt", names)
                 self.assertFalse(any("__pycache__" in name or name.endswith(".pyc") for name in names))

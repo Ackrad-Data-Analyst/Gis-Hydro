@@ -11,12 +11,12 @@ result traceable.
 
 ## What the project does
 
-The package is an ArcGIS Pro Python toolbox organized in the order the work is performed.
-It can:
+The package is an ArcGIS Pro Python toolbox with one primary KMZ-to-review-package tool and
+individual troubleshooting tools. It can:
 
 1. run a workstation and license preflight;
 2. create a standard project folder structure and file geodatabase;
-3. accept KML, KMZ, or an existing GIS polygon boundary and create a checked working copy;
+3. accept KML/KMZ, populate its polygon names, and create a checked working boundary copy;
 4. preserve and hash original boundary and acquisition files;
 5. acquire configured public federal datasets for elevation, land cover, flood hazards,
    watersheds, soils, hydrologic soil groups, and road-centerline screening;
@@ -25,8 +25,10 @@ It can:
    drainage-path, and optional watershed candidates;
 8. identify candidate road and drainage crossings and compare them with supplied bridge or
    culvert records;
-9. prepare a structured preliminary HEC-RAS input review package; and
-10. create JSON and CSV QA/QC indexes that record inputs, outputs, source URLs, timestamps,
+9. prepare a structured preliminary HEC-RAS input review package;
+10. choose Imperial or Metric, combine land cover and hydrologic soils, and add elevation
+    with a transparent boundary outline to the current map; and
+11. create JSON and CSV QA/QC indexes that record inputs, outputs, source URLs, timestamps,
     hashes, coordinate systems, resolution, feature counts, coverage checks, and review notes.
 
 The source catalog is editable rather than hard-coded. It currently includes USGS 3DEP,
@@ -37,7 +39,7 @@ or authoritative.
 
 ## Work completed and tested
 
-I tested the package and its ArcGIS toolbox behavior with a 64-test synthetic regression
+I tested the package and its ArcGIS toolbox behavior with a 72-test synthetic regression
 suite. The tests cover source protection, hashing, boundary conversion and validation,
 catalog processing, safe download retries, standardization, terrain-processing controls,
 crossing screening, HEC-RAS review-package creation, QA reporting, and toolbox parameters.
@@ -120,6 +122,10 @@ Your Advanced workstation should run the included preflight first. If Spatial An
 assigned, the terrain and watershed tools become available. If it is not assigned, the
 preflight records that fact clearly instead of allowing a terrain tool to fail midway.
 
+ArcGIS Pro Advanced and Spatial Analyst are separate entitlements. Advanced alone does not
+prove that Spatial Analyst is assigned. The automated workflow requires preflight to report
+`terrain_hydrology=AVAILABLE` before terrain and combined land-cover/soil processing.
+
 ### Capability summary by workstation
 
 | Capability | My Basic workstation | Advanced workstation |
@@ -180,8 +186,9 @@ To install it:
 6. Open **View > Catalog Pane**.
 7. Under **Folders**, add a folder connection to the extracted `Gis-Hydro` folder.
 8. Expand `toolboxes\site_hydrology_workflow.pyt`.
-9. Run **00 - Environment and QA > Preflight Environment Check**.
-10. Follow `docs\user_guide.md` in numerical category order.
+9. Run **Preflight Environment Check** and confirm `terrain_hydrology=AVAILABLE`.
+10. For normal work, run **00 - START HERE > Automated Site Workflow - KMZ to Review
+    Package** once; use the individual tools only for troubleshooting.
 
 Site work should be stored outside the code folder, for example under
 `C:\Site_Hydrology\Projects`. This keeps release code separate from source data and
@@ -196,7 +203,7 @@ I will send:
 3. `docs\user_guide.md` with the numbered operating sequence;
 4. `docs\manager_quick_start.md` with illustrated setup instructions;
 5. the six numbered Pegasus screenshots, either inline or in one PDF/OneNote page;
-6. the summary showing 64 passing synthetic regression tests; and
+6. the summary showing 72 passing synthetic regression tests; and
 7. the REVIEW REQUIRED statement identifying GIS and engineering inputs.
 
 The reusable ZIP will not contain the Pegasus KMZ, project geodatabase, downloaded project
