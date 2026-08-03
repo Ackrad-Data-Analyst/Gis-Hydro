@@ -62,6 +62,23 @@ class ArcGISToolboxTests(unittest.TestCase):
             ["boundary", "project_root", "target_crs", "add_to_map"],
         )
 
+    def test_kml_boundary_candidate_tool_accepts_file_and_workspace(self):
+        fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_kml_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+
+        parameters = module.PrepareKmlBoundaryCandidates().getParameterInfo()
+        self.assertIn(module.PrepareKmlBoundaryCandidates, module.Toolbox().tools)
+        self.assertEqual(
+            [parameter.name for parameter in parameters],
+            ["boundary_file", "project_root", "boundary_name_contains", "target_crs", "add_to_map"],
+        )
+        self.assertEqual(parameters[0].filter.list, ["kml", "kmz"])
+
     def test_acquisition_tool_accepts_catalog_and_optional_source_list(self):
         fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
         toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"

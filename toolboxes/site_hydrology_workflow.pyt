@@ -19,7 +19,7 @@ if str(SOURCE_ROOT) not in sys.path:
 
 from hydro_workflow.arcgis_capabilities import evaluate_capabilities, load_capability_config
 from hydro_workflow.authoritative_acquisition import acquire_catalog_sources
-from hydro_workflow.boundary_validation import import_and_validate_boundary
+from hydro_workflow.boundary_validation import import_and_validate_boundary, import_kml_boundary
 from hydro_workflow.data_standardization import validate_standardize_data
 from hydro_workflow.crossing_screening import screen_crossings
 from hydro_workflow.complete_workflow import run_complete_workflow
@@ -37,6 +37,7 @@ class Toolbox:
         self.tools = [
             PreflightEnvironmentCheck,
             CreateProjectWorkspace,
+            PrepareKmlBoundaryCandidates,
             ImportValidateBoundary,
             DownloadAuthoritativeData,
             ValidateStandardizeData,
@@ -371,6 +372,81 @@ class ImportValidateBoundary:
             project = arcpy.mp.ArcGISProject("CURRENT")
             if project.activeMap is not None:
                 project.activeMap.addDataFromPath(result.imported_boundary)
+
+
+class PrepareKmlBoundaryCandidates:
+    """Convert and import a named project boundary from KML/KMZ."""
+
+    def __init__(self):
+        self.label = "Import and Validate KML/KMZ Boundary"
+        self.description = (
+            "Convert a KML/KMZ read-only, select polygons by name, validate them, "
+            "and import the project boundary without changing the source."
+        )
+        self.category = "01 - Project Setup"
+        self.canRunInBackground = False
+
+    def getParameterInfo(self):
+        source = arcpy.Parameter(
+            displayName="Project Boundary KML or KMZ",
+            name="boundary_file",
+            datatype="DEFile",
+            parameterType="Required",
+            direction="Input",
+        )
+        source.filter.list = ["kml", "kmz"]
+        project_root = arcpy.Parameter(
+            displayName="Existing Project Workspace",
+            name="project_root",
+            datatype="DEFolder",
+            parameterType="Required",
+            direction="Input",
+        )
+        boundary_name = arcpy.Parameter(
+            displayName="Boundary Name Contains (for example: Project Boundary)",
+            name="boundary_name_contains",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input",
+        )
+        target_crs = arcpy.Parameter(
+            displayName="Target Coordinate System (Optional; REVIEW REQUIRED)",
+            name="target_crs",
+            datatype="GPCoordinateSystem",
+            parameterType="Optional",
+            direction="Input",
+        )
+        add_to_map = arcpy.Parameter(
+            displayName="Add Imported Boundary to Current Map",
+            name="add_to_map",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input",
+        )
+        add_to_map.value = True
+        return [source, project_root, boundary_name, target_crs, add_to_map]
+
+    def isLicensed(self):
+        return arcpy.ProductInfo() not in {"NotInitialized", "Unavailable"}
+
+    def updateParameters(self, parameters): return
+    def updateMessages(self, parameters): return
+
+    def execute(self, parameters, messages):
+        candidates, result = import_kml_boundary(
+            Path(parameters[0].valueAsText),
+            Path(parameters[1].valueAsText),
+            arcpy,
+            parameters[2].valueAsText,
+            parameters[3].value if parameters[3].value else None,
+        )
+        arcpy.AddMessage(f"Converted source: {candidates.output_geodatabase}")
+        arcpy.AddMessage(f"Imported boundary: {result.imported_boundary}")
+        if bool(parameters[4].value):
+            project = arcpy.mp.ArcGISProject("CURRENT")
+            if project.activeMap is not None:
+                project.activeMap.addDataFromPath(result.imported_boundary)
+        arcpy.AddWarning(result.review_notes)
 
 
 class CreateProjectWorkspace:

@@ -14,6 +14,10 @@ class ArcPyBoundaryAdapter(Protocol):
     def Exists(self, path: str) -> bool: ...
     def Describe(self, value: str) -> Any: ...
 
+    class conversion(Protocol):
+        @staticmethod
+        def KMLToLayer(value: str, output_folder: str, output_name: str, *args: Any): ...
+
     class management(Protocol):
         @staticmethod
         def GetCount(value: str): ...
@@ -23,6 +27,8 @@ class ArcPyBoundaryAdapter(Protocol):
         def CopyFeatures(value: str, output: str): ...
         @staticmethod
         def Project(value: str, output: str, spatial_reference: Any): ...
+        @staticmethod
+        def MakeFeatureLayer(value: str, output: str, where_clause: str | None = None): ...
 
 
 @dataclass(frozen=True)
@@ -38,6 +44,22 @@ class BoundaryValidationResult:
     extent: dict[str, float]
     source_sha256: str | None
     geometry_error_count: int
+    status: str
+    review_notes: str
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class BoundaryCandidateResult:
+    """Read-only KML/KMZ conversion result requiring an operator selection."""
+
+    source: str
+    source_sha256: str
+    converted_at: str
+    output_geodatabase: str
+    polygon_candidates: tuple[str, ...]
     status: str
     review_notes: str
 
@@ -73,6 +95,104 @@ def _load_workspace(project_root: Path) -> tuple[Path, Path]:
     if not geodatabase.is_dir():
         raise ValueError(f"Project geodatabase is missing: {geodatabase}")
     return root, geodatabase
+
+
+def prepare_kml_boundary_candidates(
+    source: Path,
+    project_root: Path,
+    arcpy_adapter: ArcPyBoundaryAdapter,
+) -> BoundaryCandidateResult:
+    """Convert a KML/KMZ into working polygon candidates without changing it.
+
+    KML/KMZ files can contain rights-of-way, corridors, and other polygons in
+    addition to the actual project boundary.  This function deliberately does
+    not guess which polygon is the project extent; the operator must review and
+    select the correct polygon candidate before boundary validation.
+    """
+    root, _ = _load_workspace(project_root)
+    source_path = source.expanduser().resolve()
+    if source_path.suffix.lower() not in {".kml", ".kmz"}:
+        raise ValueError("Boundary candidate conversion accepts only .kml or .kmz files")
+    if not source_path.is_file():
+        raise ValueError(f"Boundary file does not exist: {source_path}")
+
+    before_hash = _hash_file(str(source_path))
+    assert before_hash is not None
+    conversion_root = root / "intake" / "boundary_candidates"
+    if conversion_root.exists():
+        raise FileExistsError(
+            f"Boundary candidates already exist and will not be overwritten: {conversion_root}"
+        )
+    conversion_root.mkdir(parents=True)
+    output_name = "boundary_candidates"
+    arcpy_adapter.conversion.KMLToLayer(
+        str(source_path), str(conversion_root), output_name, "NO_GROUNDOVERLAY"
+    )
+    output_gdb = conversion_root / f"{output_name}.gdb"
+    if not arcpy_adapter.Exists(str(output_gdb)):
+        raise RuntimeError(f"KML/KMZ conversion did not create the expected geodatabase: {output_gdb}")
+
+    candidates: list[str] = []
+    for relative in ("Placemarks/Polygons", "Polygons"):
+        candidate = str(output_gdb / relative)
+        if arcpy_adapter.Exists(candidate):
+            candidates.append(candidate)
+    if not candidates:
+        raise ValueError("The KML/KMZ conversion produced no polygon boundary candidates")
+    if _hash_file(str(source_path)) != before_hash:
+        raise RuntimeError("Source integrity failure: the KML/KMZ hash changed during conversion")
+
+    result = BoundaryCandidateResult(
+        source=str(source_path),
+        source_sha256=before_hash,
+        converted_at=datetime.now(timezone.utc).isoformat(),
+        output_geodatabase=str(output_gdb),
+        polygon_candidates=tuple(candidates),
+        status="REVIEW",
+        review_notes=(
+            "REVIEW REQUIRED: select only the actual project-boundary polygon(s). "
+            "Do not treat rights-of-way, corridors, or other KML/KMZ polygons as the site boundary."
+        ),
+    )
+    report_path = root / "qa_qc" / "boundary_candidate_conversion.json"
+    report_path.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return result
+
+
+def import_kml_boundary(
+    source: Path,
+    project_root: Path,
+    arcpy_adapter: ArcPyBoundaryAdapter,
+    boundary_name_contains: str,
+    target_spatial_reference: Any | None = None,
+) -> tuple[BoundaryCandidateResult, BoundaryValidationResult]:
+    """Convert, select, validate, and import a named boundary from KML/KMZ.
+
+    The name fragment is mandatory because a KMZ may also contain rights-of-way
+    and corridors. The selection is case-insensitive and must match at least one
+    polygon. All matching parts are retained as one project-boundary layer.
+    """
+    name_fragment = boundary_name_contains.strip()
+    if not name_fragment:
+        raise ValueError(
+            "Boundary Name Contains is required for KML/KMZ so the tool does not guess "
+            "between the project boundary, rights-of-way, and other polygons"
+        )
+    candidate_result = prepare_kml_boundary_candidates(source, project_root, arcpy_adapter)
+    polygon_source = candidate_result.polygon_candidates[0]
+    escaped = name_fragment.replace("'", "''")
+    where_clause = f"UPPER(Name) LIKE '%{escaped.upper()}%'"
+    selected_layer = "site_hydrology_selected_boundary"
+    arcpy_adapter.management.MakeFeatureLayer(polygon_source, selected_layer, where_clause)
+    selected_count = _result_count(arcpy_adapter.management.GetCount(selected_layer))
+    if selected_count < 1:
+        raise ValueError(
+            f"No KML/KMZ polygon name contains {name_fragment!r}; review the source names and try again"
+        )
+    validation = import_and_validate_boundary(
+        selected_layer, project_root, arcpy_adapter, target_spatial_reference
+    )
+    return candidate_result, validation
 
 
 def import_and_validate_boundary(

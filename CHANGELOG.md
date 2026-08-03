@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 - 2026-08-03
+
+- Added read-only KML/KMZ boundary-candidate conversion to the ArcGIS toolbox.
+- Connected KML/KMZ conversion, name-based polygon selection, geometry validation,
+  and boundary import into one ArcGIS tool so operators do not run a separate conversion.
+- Kept project-boundary selection explicit when a source also contains rights-of-way,
+  corridors, or other polygons, and added before/after source-hash protection.
+
 ## 0.2.1 - 2026-08-02
 
 - Added a manager handoff guide with illustrated ArcGIS Pro setup steps.
