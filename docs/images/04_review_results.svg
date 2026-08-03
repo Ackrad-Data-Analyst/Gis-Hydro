@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="390" viewBox="0 0 980 390">
+  <rect width="980" height="390" fill="#eef1f4"/><rect x="30" y="25" width="920" height="340" fill="white" stroke="#8793a1"/>
+  <text x="60" y="70" font-family="Segoe UI" font-size="23" font-weight="600">Preflight completed with warnings</text>
+  <rect x="60" y="95" width="860" height="190" fill="#f8fafc" stroke="#c1c8d0"/>
+  <text x="80" y="130" font-family="Consolas" font-size="17" fill="#16733c">AVAILABLE: project_workspace</text>
+  <text x="80" y="165" font-family="Consolas" font-size="17" fill="#16733c">AVAILABLE: boundary_validation</text>
+  <text x="80" y="200" font-family="Consolas" font-size="17" fill="#9a6700">UNAVAILABLE: terrain_hydrology — Spatial=NotLicensed</text>
+  <text x="80" y="235" font-family="Consolas" font-size="17" fill="#9a6700">UNAVAILABLE: lidar_terrain_processing — 3D=NotLicensed</text>
+  <text x="80" y="270" font-family="Consolas" font-size="17" fill="#9a6700">UNAVAILABLE: advanced_image_analysis — ImageAnalyst=NotLicensed</text>
+  <text x="60" y="325" font-family="Segoe UI" font-size="18">Warnings show license limits. They do not mean the toolbox failed.</text>
+</svg>
