@@ -13,6 +13,10 @@ class _Parameter:
         self.value = None
         self.filter = types.SimpleNamespace(list=[])
 
+    @property
+    def valueAsText(self):
+        return str(self.value) if self.value is not None else None
+
 
 class ArcGISToolboxTests(unittest.TestCase):
     def test_preflight_dialog_uses_only_input_parameters(self):
@@ -78,6 +82,28 @@ class ArcGISToolboxTests(unittest.TestCase):
             ["boundary_file", "project_root", "boundary_name_contains", "target_crs", "add_to_map"],
         )
         self.assertEqual(parameters[0].filter.list, ["kml", "kmz"])
+
+    def test_kml_boundary_names_populate_from_selected_kmz(self):
+        from tempfile import TemporaryDirectory
+        from helpers import make_kmz
+
+        fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_kml_names_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+
+        with TemporaryDirectory() as temp:
+            kmz = make_kmz(Path(temp) / "boundary.kmz")
+            tool = module.PrepareKmlBoundaryCandidates()
+            parameters = tool.getParameterInfo()
+            parameters[0].value = str(kmz)
+            tool.updateParameters(parameters)
+
+        self.assertEqual(parameters[2].filter.list, ["Synthetic boundary"])
+        self.assertEqual(parameters[2].value, "Synthetic boundary")
 
     def test_acquisition_tool_accepts_catalog_and_optional_source_list(self):
         fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)

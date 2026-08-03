@@ -21,6 +21,18 @@ class ManagerHandoffTests(unittest.TestCase):
         self.assertNotIn("pip install", guide)
         self.assertNotIn("```powershell", guide.lower())
 
+    def test_manager_message_uses_first_person_and_documents_screenshots(self):
+        root = Path(__file__).parents[1]
+        message = (root / "docs" / "manager_handoff_message.md").read_text(encoding="utf-8")
+        self.assertIn("I am submitting", message)
+        self.assertIn("Screenshot 1", message)
+        self.assertIn("Screenshot 6", message)
+        self.assertIn("My Basic workstation", message)
+        self.assertIn("Advanced workstation", message)
+        self.assertIn("Gis-Hydro.zip", message)
+        self.assertNotIn("Codex", message)
+        self.assertNotIn("ChatGPT", message)
+
 
 if __name__ == "__main__":
     unittest.main()

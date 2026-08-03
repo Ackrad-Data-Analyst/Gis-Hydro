@@ -127,6 +127,21 @@ class BoundaryValidationTests(unittest.TestCase):
                 prepare_kml_boundary_candidates(source, root, _ArcPy(str(source)))
             self.assertEqual(marker.read_text(), "do not overwrite")
 
+    def test_matching_kmz_conversion_is_resumed_after_selection_failure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"
+            _workspace(root)
+            (root / "intake").mkdir()
+            source = Path(temp) / "boundary.kmz"
+            source.write_bytes(b"synthetic kmz fixture")
+            adapter = _ArcPy(str(source))
+            first = prepare_kml_boundary_candidates(source, root, adapter)
+
+            resumed = prepare_kml_boundary_candidates(source, root, adapter)
+
+            self.assertEqual(resumed.source_sha256, first.source_sha256)
+            self.assertEqual(resumed.polygon_candidates, first.polygon_candidates)
+
     def test_polygon_is_copied_and_reported_without_source_change(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "site"

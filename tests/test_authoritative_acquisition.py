@@ -10,8 +10,8 @@ from hydro_workflow.authoritative_acquisition import acquire_catalog_sources
 class _Management:
     def __init__(self, owner): self.owner = owner
     def MakeFeatureLayer(self, url, name, where): self.owner.layers.add(name)
-    def MakeImageServerLayer(self, url, name, where):
-        self.owner.layers.add(name); self.owner.image_filters[name] = where
+    def MakeImageServerLayer(self, url, name, where_clause=None):
+        self.owner.layers.add(name); self.owner.image_filters[name] = where_clause
     def SelectLayerByLocation(self, *args, **kwargs): return None
     def Clip(self, url, rectangle, output, *args): Path(output).write_bytes(b"synthetic raster")
     def CopyRaster(self, source, output): self.owner.outputs.add(output)
@@ -83,13 +83,36 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             acquire_catalog_sources(root, [source], adapter)
             self.assertEqual(adapter.image_filters["Annual_Land_Cover_filtered_image"], "Year=2024")
 
-    def test_existing_original_is_never_overwritten(self):
+    def test_existing_success_is_reused_without_overwrite(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "site"; _project(root)
             source = _source("Existing", "extract")
-            acquire_catalog_sources(root, [source], _ArcPy())
-            with self.assertRaises(FileExistsError):
-                acquire_catalog_sources(root, [source], _ArcPy())
+            adapter = _ArcPy()
+            first = acquire_catalog_sources(root, [source], adapter)[0]
+            original_bytes = Path(first.original_output).read_bytes()
+            second = acquire_catalog_sources(root, [source], adapter)[0]
+            self.assertEqual(first, second)
+            self.assertEqual(Path(first.original_output).read_bytes(), original_bytes)
+            self.assertFalse(list((root / "data" / "original" / "authoritative").glob("Existing_retry_*")))
+
+    def test_failed_attempt_gets_new_retry_folder_without_overwrite(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            source = _source("Retry_Me", "unsupported")
+            first = acquire_catalog_sources(root, [source], _ArcPy())[0]
+            self.assertEqual(first.status, "FAIL")
+            first_record = Path(root / "data" / "original" / "authoritative" / "Retry_Me" / "acquisition_record.json")
+            first_bytes = first_record.read_bytes()
+            second = acquire_catalog_sources(root, [source], _ArcPy())[0]
+            self.assertEqual(second.status, "FAIL")
+            self.assertEqual(first_record.read_bytes(), first_bytes)
+            self.assertEqual(len(list(first_record.parent.parent.glob("Retry_Me_retry_*"))), 1)
+
+    def test_vector_original_uses_geojson_extension(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            result = acquire_catalog_sources(root, [_source("Vector", "spatial_query_clip")], _ArcPy())[0]
+            self.assertEqual(Path(result.original_output).suffix, ".geojson")
 
 
 if __name__ == "__main__":

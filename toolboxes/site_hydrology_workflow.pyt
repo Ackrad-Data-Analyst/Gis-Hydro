@@ -24,6 +24,7 @@ from hydro_workflow.data_standardization import validate_standardize_data
 from hydro_workflow.crossing_screening import screen_crossings
 from hydro_workflow.complete_workflow import run_complete_workflow
 from hydro_workflow.hec_ras_package import build_hec_ras_review_package
+from hydro_workflow.kmz_inspector import list_kml_polygon_names
 from hydro_workflow.project_workspace import create_project_workspace
 from hydro_workflow.qa_package import generate_qa_package
 from hydro_workflow.source_catalog import load_source_catalog
@@ -429,16 +430,45 @@ class PrepareKmlBoundaryCandidates:
     def isLicensed(self):
         return arcpy.ProductInfo() not in {"NotInitialized", "Unavailable"}
 
-    def updateParameters(self, parameters): return
-    def updateMessages(self, parameters): return
+    def updateParameters(self, parameters):
+        source_text = parameters[0].valueAsText
+        if not source_text or not Path(source_text).is_file():
+            return
+        try:
+            names = list_kml_polygon_names(Path(source_text))
+        except ValueError:
+            return
+        parameters[2].filter.list = names
+        if parameters[2].valueAsText:
+            return
+        preferred = [
+            name for name in names
+            if "boundary" in name.lower()
+            and not any(token in name.lower() for token in ("row", "right of way", "corridor"))
+        ]
+        if len(preferred) == 1:
+            parameters[2].value = preferred[0]
+
+    def updateMessages(self, parameters):
+        source_text = parameters[0].valueAsText
+        if source_text and Path(source_text).is_file():
+            try:
+                names = list_kml_polygon_names(Path(source_text))
+            except ValueError as exc:
+                parameters[0].setErrorMessage(str(exc))
+                return
+            if not names:
+                parameters[0].setErrorMessage("The KML/KMZ contains no named polygon placemarks.")
 
     def execute(self, parameters, messages):
+        polygon_names = list_kml_polygon_names(Path(parameters[0].valueAsText))
         candidates, result = import_kml_boundary(
             Path(parameters[0].valueAsText),
             Path(parameters[1].valueAsText),
             arcpy,
             parameters[2].valueAsText,
             parameters[3].value if parameters[3].value else None,
+            polygon_names,
         )
         arcpy.AddMessage(f"Converted source: {candidates.output_geodatabase}")
         arcpy.AddMessage(f"Imported boundary: {result.imported_boundary}")

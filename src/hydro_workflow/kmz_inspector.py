@@ -9,6 +9,49 @@ from typing import Any
 from xml.etree import ElementTree
 
 
+def _local_name(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _polygon_names_from_root(root: ElementTree.Element) -> list[str]:
+    names: list[str] = []
+    for placemark in (element for element in root.iter() if _local_name(element.tag) == "Placemark"):
+        if not any(_local_name(element.tag) == "Polygon" for element in placemark.iter()):
+            continue
+        name = next(
+            (
+                (element.text or "").strip()
+                for element in placemark
+                if _local_name(element.tag) == "name" and (element.text or "").strip()
+            ),
+            "",
+        )
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+def list_kml_polygon_names(path: Path) -> list[str]:
+    """Return polygon placemark names from KML/KMZ without extracting or editing it."""
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".kml":
+            return _polygon_names_from_root(ElementTree.parse(path).getroot())
+        if suffix == ".kmz":
+            names: list[str] = []
+            with zipfile.ZipFile(path, "r") as archive:
+                for member in archive.namelist():
+                    if not member.lower().endswith(".kml"):
+                        continue
+                    for name in _polygon_names_from_root(ElementTree.fromstring(archive.read(member))):
+                        if name not in names:
+                            names.append(name)
+            return names
+    except (OSError, zipfile.BadZipFile, ElementTree.ParseError) as exc:
+        raise ValueError(f"Cannot read KML/KMZ polygon names: {exc}") from exc
+    raise ValueError("Polygon-name inspection accepts only .kml or .kmz files")
+
+
 def inspect_kmz(path: Path) -> dict[str, Any]:
     result: dict[str, Any] = {
         "valid_kmz": False, "kml_files": [], "folder_count": 0,

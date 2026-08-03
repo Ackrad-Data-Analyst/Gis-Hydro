@@ -120,8 +120,29 @@ def prepare_kml_boundary_candidates(
     assert before_hash is not None
     conversion_root = root / "intake" / "boundary_candidates"
     if conversion_root.exists():
+        report_path = root / "qa_qc" / "boundary_candidate_conversion.json"
+        if report_path.is_file():
+            previous = json.loads(report_path.read_text(encoding="utf-8"))
+            previous_hash = previous.get("source_sha256")
+            previous_candidates = tuple(previous.get("polygon_candidates", ()))
+            if (
+                previous.get("source") == str(source_path)
+                and previous_hash == before_hash
+                and previous_candidates
+                and all(arcpy_adapter.Exists(candidate) for candidate in previous_candidates)
+            ):
+                return BoundaryCandidateResult(
+                    source=previous["source"],
+                    source_sha256=previous_hash,
+                    converted_at=previous["converted_at"],
+                    output_geodatabase=previous["output_geodatabase"],
+                    polygon_candidates=previous_candidates,
+                    status=previous["status"],
+                    review_notes=previous["review_notes"],
+                )
         raise FileExistsError(
-            f"Boundary candidates already exist and will not be overwritten: {conversion_root}"
+            "Boundary candidates already exist but do not match this source and will not be overwritten: "
+            f"{conversion_root}"
         )
     conversion_root.mkdir(parents=True)
     output_name = "boundary_candidates"
@@ -165,6 +186,7 @@ def import_kml_boundary(
     arcpy_adapter: ArcPyBoundaryAdapter,
     boundary_name_contains: str,
     target_spatial_reference: Any | None = None,
+    available_polygon_names: list[str] | None = None,
 ) -> tuple[BoundaryCandidateResult, BoundaryValidationResult]:
     """Convert, select, validate, and import a named boundary from KML/KMZ.
 
@@ -186,8 +208,10 @@ def import_kml_boundary(
     arcpy_adapter.management.MakeFeatureLayer(polygon_source, selected_layer, where_clause)
     selected_count = _result_count(arcpy_adapter.management.GetCount(selected_layer))
     if selected_count < 1:
+        available_text = ", ".join(available_polygon_names or []) or "none found"
         raise ValueError(
-            f"No KML/KMZ polygon name contains {name_fragment!r}; review the source names and try again"
+            f"No KML/KMZ polygon name contains {name_fragment!r}. "
+            f"Available polygon names: {available_text}"
         )
     validation = import_and_validate_boundary(
         selected_layer, project_root, arcpy_adapter, target_spatial_reference

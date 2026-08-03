@@ -50,6 +50,18 @@
       "resampling": "VECTOR"
     },
     {
+      "name": "USGS_TNM_Roads",
+      "category": "Road centerlines",
+      "source_agency": "USGS National Geospatial Program",
+      "source_type": "map_service_layer",
+      "item_id": "",
+      "rest_url": "https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/0",
+      "authentication": "none",
+      "operation": "select_intersecting_copy",
+      "filter": "1=1",
+      "resampling": "VECTOR"
+    },
+    {
       "name": "SSURGO_Hydrologic_Group",
       "category": "Hydrologic Soil Groups",
       "source_agency": "USDA NRCS",
@@ -67,7 +79,7 @@
       "source_agency": "USDA NRCS",
       "source_type": "portal_feature",
       "item_id": "06e5fd61bdb6453fb16534c676e1c9b9",
-      "rest_url": "https://landscape11.arcgis.com/arcgis/rest/services/USA_Soils_Map_Units/FeatureServer",
+      "rest_url": "https://landscape11.arcgis.com/arcgis/rest/services/USA_Soils_Map_Units/FeatureServer/0",
       "authentication": "arcgis_org",
       "operation": "spatial_query_clip",
       "filter": "",

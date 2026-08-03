@@ -1,10 +1,36 @@
 # Changelog
 
+## 0.3.3 - 2026-08-03
+
+- Added a configurable federal USGS National Map road-centerline source for nationwide
+  fallback crossing screening.
+- Expanded the operator guide with installation, complete stage order, license checks,
+  1 m DEM verification, safe retry behavior, acceptance checks, and explicit review inputs.
+- Added a manager-ready handoff message that distinguishes tested Basic-license behavior,
+  Advanced/Spatial Analyst expectations, traceability, and engineering limitations.
+- Rewrote the handoff as a first-person submission message with current capabilities,
+  installation steps, package contents, and a manager acceptance-test procedure.
+- Added a six-screenshot Pegasus test narrative, Basic-versus-Advanced capability table,
+  incorporated resolutions, and an explicit manager-submission checklist.
+- Added a standard-library release builder that creates a personalized manager PDF, clean
+  toolbox ZIP, and SHA-256 release manifest without packaging project data.
+
+## 0.3.2 - 2026-08-03
+
+- Corrected image-service filter placement and GeoJSON output naming for live ArcGIS
+  authoritative-data acquisition.
+- Corrected the SSURGO map-unit catalog URL to address a feature layer rather than its
+  FeatureServer container.
+- Preserve completed acquisitions on rerun and place failed retries in new timestamped
+  folders so immutable downloaded sources are never overwritten.
+
 ## 0.3.1 - 2026-08-03
 
 - Added read-only KML/KMZ boundary-candidate conversion to the ArcGIS toolbox.
 - Connected KML/KMZ conversion, name-based polygon selection, geometry validation,
   and boundary import into one ArcGIS tool so operators do not run a separate conversion.
+- Populate the boundary-name control from polygon placemarks in the selected KML/KMZ,
+  report available names on a mismatch, and safely resume an identical prior conversion.
 - Kept project-boundary selection explicit when a source also contains rights-of-way,
   corridors, or other polygons, and added before/after source-hash protection.
 

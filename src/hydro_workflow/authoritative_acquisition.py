@@ -73,6 +73,27 @@ def _describe_output(arcpy_adapter: Any, output: str) -> tuple[str | None, str |
     return crs, resolution
 
 
+def _existing_success(source_folder: Path, arcpy_adapter: Any) -> AcquisitionResult | None:
+    """Return a completed acquisition without replacing its immutable source file."""
+    record_path = source_folder / "acquisition_record.json"
+    if not record_path.is_file():
+        return None
+    try:
+        payload = json.loads(record_path.read_text(encoding="utf-8"))
+        result = AcquisitionResult(**payload)
+    except (OSError, ValueError, TypeError):
+        return None
+    if (
+        result.status == "REVIEW"
+        and result.original_output
+        and Path(result.original_output).is_file()
+        and result.working_output
+        and arcpy_adapter.Exists(result.working_output)
+    ):
+        return result
+    return None
+
+
 def acquire_catalog_sources(
     project_root: Path,
     sources: list[dict[str, str]],
@@ -97,9 +118,12 @@ def acquire_catalog_sources(
         safe_name = _safe_name(source["name"])
         source_folder = original_root / safe_name
         if source_folder.exists():
-            raise FileExistsError(
-                f"Original acquisition already exists and will not be overwritten: {source_folder}"
-            )
+            completed = _existing_success(source_folder, arcpy_adapter)
+            if completed is not None:
+                results.append(completed)
+                continue
+            retry_suffix = requested_at.replace(":", "").replace("+", "_").replace(".", "_")
+            source_folder = original_root / f"{safe_name}_retry_{retry_suffix}"
         source_folder.mkdir(parents=True, exist_ok=False)
         original_output: Path | None = None
         working_output: str | None = None
@@ -118,7 +142,8 @@ def acquire_catalog_sources(
                 arcpy_adapter.management.SelectLayerByLocation(
                     layer_name, "INTERSECT", boundary, selection_type="NEW_SELECTION"
                 )
-                original_output = source_folder / f"{safe_name}.json"
+                # ArcGIS writes GeoJSON only when the output has a GeoJSON extension.
+                original_output = source_folder / f"{safe_name}.geojson"
                 arcpy_adapter.conversion.FeaturesToJSON(
                     layer_name, str(original_output), "FORMATTED", "NO_Z_VALUES", "NO_M_VALUES", "GEOJSON"
                 )
@@ -139,7 +164,7 @@ def acquire_catalog_sources(
                 if configured_filter:
                     raster_input = f"{safe_name}_filtered_image"
                     arcpy_adapter.management.MakeImageServerLayer(
-                        source["rest_url"], raster_input, configured_filter
+                        source["rest_url"], raster_input, where_clause=configured_filter
                     )
                 arcpy_adapter.management.Clip(
                     raster_input, rectangle, str(original_output), boundary,

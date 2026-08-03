@@ -1,9 +1,76 @@
-# User guide
+# ArcGIS Pro operator guide
 
-1. Keep approved source material in a dedicated read-only folder.
-2. Choose a separate output folder; the CLI rejects output at or inside the source folder.
-3. Review the JSON-compatible YAML rules in `config/` and retain the draft notice.
-4. Run the command shown in `README.md`.
-5. Check `source_integrity_report.json` first, then review every FAIL and REVIEW row.
+## Required workstation capabilities
 
-PASS means only a readable file confidently matched a filename rule. It does **not** validate CRS, units, datum, accuracy, coverage, currency, or engineering suitability. Unknown provenance and all engineering conclusions are REVIEW REQUIRED. A dry run prints a summary and creates no folders or files. KMZ inspection occurs in memory without extracting content.
+- ArcGIS Pro Basic or higher: workspace, boundary, downloads, standardization, crossings,
+  HEC-RAS review-package export, and QA reporting.
+- Spatial Analyst: terrain filling, flow direction, flow accumulation, stream candidates,
+  pour-point snapping, and watershed candidates.
+- Internet and portal access required by the selected catalog rows.
+
+An Advanced product license does not by itself prove that Spatial Analyst is assigned.
+Run **00 - Environment and QA > Preflight Environment Check** and confirm
+`terrain_hydrology=AVAILABLE` before terrain processing.
+
+## Installation
+
+1. Close ArcGIS Pro before replacing an existing toolbox version.
+2. Extract the release ZIP to a permanent folder outside all project workspaces.
+3. Double-click `tools\Open Site Hydrology Toolbox.cmd`, or connect the extracted folder
+   from **View > Catalog Pane > Folders > Add Folder Connection**.
+4. Expand `toolboxes\site_hydrology_workflow.pyt`.
+5. Store site work under a separate root such as `C:\Site_Hydrology\Projects`.
+
+On Windows, double-click `tools\Build Manager Package.cmd`. It uses the Python environment
+included with ArcGIS Pro, stops if packaging fails, verifies the expected ZIP, and opens
+the completed package folder. A separate Microsoft Store Python installation is not needed.
+
+Release maintainers can alternatively build a personalized manager PDF and clean ZIP
+without adding dependencies:
+
+`python tools\build_manager_release.py --manager "Manager Name" --author "Author Name"`
+
+## Complete preliminary workflow
+
+Run categories in numerical order. Do not rerun a completed stage over existing outputs.
+
+1. **00 - Preflight:** record product and extension availability.
+2. **01 - Create Project Workspace:** provide a project name and projects root.
+3. **01 - Import and Validate KML/KMZ Boundary:** select the source, workspace, and exact
+   polygon candidate. Visually compare the imported polygon with the approved site exhibit.
+4. **02 - Download Authoritative Data:** leave Source Names blank to run the catalog. The
+   catalog includes federal DEM, roads, watershed, land-cover and flood sources plus USDA
+   soil sources. Completed immutable downloads are reused; failures receive separate retry
+   records.
+5. **03 - Validate, Standardize, and Clip:** select the engineer/GIS-approved project CRS.
+6. **04 - Prepare Terrain, Drainage, and Watershed Candidates:** select the standardized
+   DEM and enter reviewed terrain parameters. A requested 1 m DEM must be confirmed from
+   the acquisition and standardization reports; do not treat resampled coarse data as new
+   1 m accuracy.
+7. **05 - Screen Roads, Bridges, Culverts, and Drainage Crossings:** use standardized
+   `USGS_TNM_Roads`, or replace it with a more authoritative state/local DOT layer when
+   available. Bridge/culvert inputs and search distance are optional and REVIEW REQUIRED.
+8. **06 - Prepare Preliminary HEC-RAS Review Package:** export terrain and available vector
+   candidates. Missing banks, cross sections, structures, rainfall, infiltration, or
+   boundary conditions remain explicitly listed; they are not invented.
+9. **07 - Generate QA/QC Package:** retain the JSON and CSV index with the project.
+
+## Engineer/GIS inputs that remain explicit
+
+- approved projected CRS and any datum transformation;
+- whether DEM depressions should be filled;
+- stream threshold in contributing cells;
+- pour points and snap distance when watersheds are requested;
+- structure search distance when known bridges/culverts are supplied;
+- final HEC-RAS geometry and hydraulic/hydrologic parameters.
+
+## Acceptance and troubleshooting
+
+- `REVIEW` is an expected preliminary status, not engineering approval.
+- On a red acquisition result, do not delete successful source folders. Install the latest
+  toolbox release and rerun; safe retry folders preserve earlier attempts.
+- Confirm every required acquisition and standardized dataset in `qa_qc` before terrain.
+- Confirm the DEM report shows actual source cell size and site coverage. A 1 m request is
+  conditional on authoritative 1 m coverage at the site.
+- Preserve the original boundary and downloaded agency files; work only from generated
+  working copies.
