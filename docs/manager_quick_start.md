@@ -34,6 +34,10 @@ On the receiving computer:
 Do not save project boundaries, downloaded agency data, or reports inside this code
 folder. I keep project work under `C:\Site_Hydrology\Projects`.
 
+The **Extract all** button must no longer be visible when opening the `tools` folder.
+If File Explorer shows a **Compressed size** column or an **Extract all** button, the ZIP
+is still being browsed and the launcher cannot see the adjacent `toolboxes` folder.
+
 ![Download and extract the toolbox package](images/01_download_and_extract.svg)
 
 ## Open the toolbox without a command line
@@ -45,6 +49,10 @@ Open the extracted folder and double-click:
 The launcher opens the correct `toolboxes` folder and starts ArcGIS Pro. It does not need
 administrator rights, install packages, change the ArcGIS Python environment, or copy any
 project data.
+
+If the launcher says **Site Hydrology toolbox cannot start**, close the command window,
+extract the full ZIP, and run the launcher from the extracted `Gis-Hydro\tools` folder.
+Do not double-click the launcher while browsing inside the ZIP.
 
 If the launcher cannot find ArcGIS Pro, open ArcGIS Pro normally and continue below.
 

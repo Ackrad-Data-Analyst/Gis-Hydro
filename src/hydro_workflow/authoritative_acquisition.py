@@ -236,7 +236,18 @@ def stage_existing_map_sources(
         description = arcpy_adapter.Describe(dataset)
         data_type = str(getattr(description, "dataType", ""))
         if "raster" in data_type.lower():
-            arcpy_adapter.management.CopyRaster(dataset, output)
+            working_root = root / "data" / "working"
+            working_root.mkdir(parents=True, exist_ok=True)
+            clipped_snapshot = working_root / f"{safe_name}_map_clip.tif"
+            if clipped_snapshot.exists():
+                raise FileExistsError(f"Clipped map snapshot exists and will not be overwritten: {clipped_snapshot}")
+            extent = arcpy_adapter.Describe(boundary).extent
+            rectangle = f"{extent.XMin} {extent.YMin} {extent.XMax} {extent.YMax}"
+            arcpy_adapter.management.Clip(
+                dataset, rectangle, str(clipped_snapshot), boundary,
+                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+            )
+            arcpy_adapter.management.CopyRaster(str(clipped_snapshot), output)
         else:
             arcpy_adapter.analysis.Clip(dataset, boundary, output)
         crs, resolution = _describe_output(arcpy_adapter, output)
@@ -245,9 +256,13 @@ def stage_existing_map_sources(
             agency="Supplied ArcGIS map", service_url=str(dataset), operation="snapshot_from_map",
             requested_at=requested_at, completed_at=datetime.now(timezone.utc).isoformat(),
             query_parameters={"boundary": boundary, "selection": "explicit operator layer role"},
-            original_output=None, working_output=output, sha256=None, coordinate_system=crs,
+            original_output=str(clipped_snapshot) if "raster" in data_type.lower() else None,
+            working_output=output,
+            sha256=_sha256(clipped_snapshot) if "raster" in data_type.lower() else None,
+            coordinate_system=crs,
             resolution_or_scale=resolution, coverage="CLIPPED_OR_COPIED_FOR_PROJECT", status="REVIEW",
-            message="Map layer snapshot completed; ownership, currency, license, and engineering suitability are REVIEW REQUIRED.",
+            message=("Map layer was clipped to the project boundary before snapshotting; ownership, "
+                     "currency, license, and engineering suitability are REVIEW REQUIRED."),
         ))
     report = root / "qa_qc" / f"acquisition_manifest_{requested_at.replace(':', '').replace('+', '_')}.json"
     report.write_text(json.dumps([item.to_dict() for item in results], indent=2, sort_keys=True) + "\n", encoding="utf-8")

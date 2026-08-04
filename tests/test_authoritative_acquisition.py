@@ -13,7 +13,8 @@ class _Management:
     def MakeImageServerLayer(self, url, name, where_clause=None):
         self.owner.layers.add(name); self.owner.image_filters[name] = where_clause
     def SelectLayerByLocation(self, *args, **kwargs): return None
-    def Clip(self, url, rectangle, output, *args): Path(output).write_bytes(b"synthetic raster")
+    def Clip(self, url, rectangle, output, *args):
+        Path(output).write_bytes(b"synthetic raster")
     def CopyRaster(self, source, output): self.owner.outputs.add(output)
 
 
@@ -125,6 +126,8 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             self.assertEqual(len(results), 2)
             self.assertTrue(all(item.operation == "snapshot_from_map" for item in results))
             self.assertTrue(all(item.status == "REVIEW" for item in results))
+            self.assertTrue(Path(results[0].original_output).is_file())
+            self.assertTrue(results[0].sha256)
             self.assertEqual(len(list((root / "qa_qc").glob("acquisition_manifest_*.json"))), 1)
 
 

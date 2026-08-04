@@ -40,6 +40,16 @@ fill choice, and data mode. **Authoritative Catalog** clips configured services;
 explicitly select from the current ArcGIS map. The automated tool creates the project file
 geodatabase and all implemented downstream review outputs.
 
+Existing map image services are selected by layer name and clipped to the project boundary
+before they are copied. This avoids ArcGIS error `001491` caused by validating or copying
+the full nationwide image service beyond its row/column limit.
+
+If an optional catalog service such as land cover or roads is unavailable, the automated
+run preserves completed terrain and QA outputs, records the skipped stage as **REVIEW
+REQUIRED**, and tells the operator to rerun with an approved existing map layer. A DEM is
+critical for terrain processing; a failed DEM stops safely with the service error and the
+location of its acquisition record.
+
 The individual tools below remain available for troubleshooting or controlled reruns.
 Do not rerun a completed stage over existing outputs.
 

@@ -7,6 +7,12 @@ from tools.build_manager_release import build_release
 
 
 class ReleaseBuilderTests(unittest.TestCase):
+    def test_toolbox_launcher_explains_that_zip_must_be_extracted(self):
+        launcher = Path("tools/Open Site Hydrology Toolbox.cmd").read_text(encoding="utf-8")
+        self.assertIn('Click "Extract all"', launcher)
+        self.assertIn("Open the extracted Gis-Hydro folder", launcher)
+        self.assertIn("if not exist \"%TOOLBOX%\"", launcher)
+
     def test_windows_launcher_uses_arcgis_python_and_checks_the_zip(self):
         launcher = Path("tools/Build Manager Package.cmd").read_text(encoding="utf-8")
         self.assertIn("ArcGIS\\Pro\\bin\\Python\\Scripts\\propy.bat", launcher)

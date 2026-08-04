@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.5
+
+- Replaced the misleading toolbox-not-found message with direct **Extract All** instructions
+  when Windows launches the command file from inside a ZIP preview.
+- Added a regression check and operator guidance for distinguishing a compressed ZIP view
+  from the extracted release folder.
+- Prevented optional NLCD or road-service outages from discarding an otherwise valid
+  terrain run; unavailable crossing inputs are now recorded as REVIEW REQUIRED.
+- Added actionable DEM failure messages and regression coverage for partial catalog outages.
+- Avoided ArcGIS image-service error 001491 in Existing Map Layers mode by using map-layer
+  name selectors and clipping remote rasters to the project boundary before CopyRaster.
+
+## 0.3.4 - 2026-08-04
+
+- Fixed the automated toolbox workflow failing with an unexpected
+  `boundary_polygon_name` argument when ArcGIS Pro retained an older in-memory copy of the
+  workflow module from a previously opened release.
+- The toolbox now prioritizes its own extracted `src` directory, reloads the complete-workflow
+  orchestrator immediately before execution, and reports a clear restart instruction if
+  ArcGIS resolves the module from another extracted release.
+
 ## Manager UX consolidation
 
 - Added a KMZ-first automated workflow as the first toolbox entry, reducing the normal run

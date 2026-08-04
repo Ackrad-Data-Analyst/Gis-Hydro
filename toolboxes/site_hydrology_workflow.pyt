@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import csv
+import importlib
 import json
 import sys
 from datetime import datetime, timezone
@@ -14,21 +15,51 @@ import arcpy
 TOOLBOX_DIR = Path(__file__).resolve().parent
 REPOSITORY_ROOT = TOOLBOX_DIR.parent
 SOURCE_ROOT = REPOSITORY_ROOT / "src"
-if str(SOURCE_ROOT) not in sys.path:
-    sys.path.insert(0, str(SOURCE_ROOT))
+# ArcGIS Pro keeps Python modules in memory after a toolbox refresh.  Always put
+# this release's source tree first so another extracted release cannot win the
+# import, then reload the orchestrator immediately before a complete run.
+source_root_text = str(SOURCE_ROOT)
+while source_root_text in sys.path:
+    sys.path.remove(source_root_text)
+sys.path.insert(0, source_root_text)
 
 from hydro_workflow.arcgis_capabilities import evaluate_capabilities, load_capability_config
 from hydro_workflow.authoritative_acquisition import acquire_catalog_sources
 from hydro_workflow.boundary_validation import import_and_validate_boundary, import_kml_boundary
 from hydro_workflow.data_standardization import validate_standardize_data
 from hydro_workflow.crossing_screening import screen_crossings
-from hydro_workflow.complete_workflow import run_complete_workflow
 from hydro_workflow.hec_ras_package import build_hec_ras_review_package
 from hydro_workflow.kmz_inspector import list_kml_polygon_names
 from hydro_workflow.project_workspace import create_project_workspace
 from hydro_workflow.qa_package import generate_qa_package
 from hydro_workflow.source_catalog import load_source_catalog
 from hydro_workflow.terrain_hydrology import prepare_terrain_hydrology
+
+
+def _load_complete_workflow_runner():
+    """Load this extracted release's orchestrator, not an ArcGIS-cached copy."""
+    module = importlib.import_module("hydro_workflow.complete_workflow")
+    expected = (SOURCE_ROOT / "hydro_workflow" / "complete_workflow.py").resolve()
+    loaded = Path(module.__file__).resolve()
+    if loaded != expected:
+        raise RuntimeError(
+            "ArcGIS loaded hydro_workflow from a different release. Close ArcGIS Pro, "
+            f"reopen this toolbox, and retry. Expected {expected}; loaded {loaded}."
+        )
+    module = importlib.reload(module)
+    return module.run_complete_workflow
+
+
+def _current_map_layer_names():
+    """Return raster and feature layer names without validating remote service size."""
+    try:
+        active_map = arcpy.mp.ArcGISProject("CURRENT").activeMap
+        layers = active_map.listLayers() if active_map is not None else []
+    except (AttributeError, RuntimeError, OSError):
+        return [], []
+    rasters = [layer.name for layer in layers if getattr(layer, "isRasterLayer", False)]
+    features = [layer.name for layer in layers if getattr(layer, "isFeatureLayer", False)]
+    return rasters, features
 
 
 class Toolbox:
@@ -64,10 +95,10 @@ class RunCompleteSiteWorkflow:
             ("Approved Project Coordinate System", "target_crs", "GPCoordinateSystem", "Required"),
             ("Output Unit System", "unit_system", "GPString", "Required"),
             ("Data Source Mode", "data_source_mode", "GPString", "Required"),
-            ("Existing Map DEM (required only for Existing Map mode)", "map_dem", "GPRasterLayer", "Optional"),
-            ("Existing Map Roads (required only for Existing Map mode)", "map_roads", "GPFeatureLayer", "Optional"),
-            ("Existing Map Land Cover (optional)", "map_land_cover", "GPRasterLayer", "Optional"),
-            ("Existing Map Hydrologic Soil Groups (optional)", "map_soils", "GPRasterLayer", "Optional"),
+            ("Existing Map DEM (required only for Existing Map mode)", "map_dem", "GPString", "Optional"),
+            ("Existing Map Roads (required only for Existing Map mode)", "map_roads", "GPString", "Optional"),
+            ("Existing Map Land Cover (optional)", "map_land_cover", "GPString", "Optional"),
+            ("Existing Map Hydrologic Soil Groups (optional)", "map_soils", "GPString", "Optional"),
             ("Stream Threshold (Contributing Cells; REVIEW REQUIRED)", "stream_threshold_cells", "GPLong", "Required"),
             ("Fill Depressions (REVIEW REQUIRED)", "fill_dem", "GPBoolean", "Required"),
             ("Authoritative Source Catalog", "source_catalog", "DEFile", "Required"),
@@ -99,6 +130,13 @@ class RunCompleteSiteWorkflow:
         use_map = parameters[6].valueAsText == "Existing Map Layers"
         for index in (7, 8, 9, 10):
             parameters[index].enabled = use_map
+        if use_map:
+            raster_names, feature_names = _current_map_layer_names()
+            for index in (7, 9, 10):
+                if raster_names:
+                    parameters[index].filter.list = raster_names
+            if feature_names:
+                parameters[8].filter.list = feature_names
         parameters[13].enabled = not use_map
     def updateMessages(self, parameters):
         source_text = parameters[2].valueAsText
@@ -115,6 +153,7 @@ class RunCompleteSiteWorkflow:
             if not parameters[8].valueAsText:
                 parameters[8].setErrorMessage("Select the approved road layer from the current map.")
     def execute(self, parameters, messages):
+        run_complete_workflow = _load_complete_workflow_runner()
         use_map = parameters[6].valueAsText == "Existing Map Layers"
         sources = [] if use_map else load_source_catalog(Path(parameters[13].valueAsText))
         map_sources = None

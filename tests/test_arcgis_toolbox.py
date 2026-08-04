@@ -1,5 +1,6 @@
 import importlib.machinery
 import importlib.util
+import inspect
 import sys
 import types
 import unittest
@@ -19,6 +20,23 @@ class _Parameter:
 
 
 class ArcGISToolboxTests(unittest.TestCase):
+    def test_complete_workflow_runner_reloads_arcgis_cached_module(self):
+        fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_reload_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+            import hydro_workflow.complete_workflow as workflow_module
+
+            workflow_module.run_complete_workflow = lambda: None
+            runner = module._load_complete_workflow_runner()
+
+        self.assertIn("boundary_polygon_name", inspect.signature(runner).parameters)
+        self.assertEqual(Path(workflow_module.__file__).resolve(), module.SOURCE_ROOT / "hydro_workflow" / "complete_workflow.py")
+
     def test_preflight_dialog_uses_only_input_parameters(self):
         fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
         toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
@@ -174,6 +192,10 @@ class ArcGISToolboxTests(unittest.TestCase):
         self.assertEqual(parameters[2].filter.list, ["kml", "kmz"])
         self.assertEqual(parameters[5].filter.list, ["Imperial", "Metric"])
         self.assertEqual(parameters[6].filter.list, ["Authoritative Catalog", "Existing Map Layers"])
+        self.assertEqual(parameters[7].datatype, "GPString")
+        self.assertEqual(parameters[8].datatype, "GPString")
+        self.assertEqual(parameters[9].datatype, "GPString")
+        self.assertEqual(parameters[10].datatype, "GPString")
 
 
 if __name__ == "__main__":

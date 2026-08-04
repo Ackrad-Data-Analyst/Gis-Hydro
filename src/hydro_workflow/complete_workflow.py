@@ -104,25 +104,54 @@ def run_complete_workflow(
         if existing_map_sources
         else acquire_catalog_sources(root, sources, arcpy_adapter)
     )
-    failures = [item.source_name for item in acquired if item.status == "FAIL"]
-    if failures: raise RuntimeError(f"Acquisition failed for: {', '.join(failures)}")
+    acquisition_failures = [item for item in acquired if item.status == "FAIL"]
+    failed_by_name = {item.source_name: item for item in acquisition_failures}
+    if dem_source_name in failed_by_name:
+        failure = failed_by_name[dem_source_name]
+        raise RuntimeError(
+            f"Required DEM acquisition failed for {dem_source_name}: {failure.message}. "
+            f"Review the acquisition record under {root / 'data' / 'original' / 'authoritative'} "
+            "or rerun with Existing Map Layers and select an approved DEM."
+        )
     standardized = validate_standardize_data(root, target_crs, arcpy_adapter)
     failed_standard = [item.source_name for item in standardized if item.status == "FAIL"]
-    if failed_standard: raise RuntimeError(f"Standardization failed for: {', '.join(failed_standard)}")
+    if dem_source_name in failed_standard:
+        raise RuntimeError(
+            f"Required DEM standardization failed for {dem_source_name}. "
+            f"Review {root / 'qa_qc' / 'data_standardization_report.json'}."
+        )
     by_name = {item.source_name: item.standardized_dataset for item in standardized}
     if not by_name.get(dem_source_name): raise ValueError(f"DEM source was not standardized: {dem_source_name}")
-    if not by_name.get(roads_source_name): raise ValueError(f"Road source was not standardized: {roads_source_name}")
 
     terrain = prepare_terrain_hydrology(
         root, by_name[dem_source_name], stream_threshold_cells, fill_dem, arcpy_adapter,
         pour_points, snap_distance,
     )
-    crossings = screen_crossings(
-        root, by_name[roads_source_name], terrain.drainage_paths, arcpy_adapter,
-        by_name.get(bridges_source_name) if bridges_source_name else None,
-        by_name.get(culverts_source_name) if culverts_source_name else None,
-        structure_search_distance,
-    )
+    crossings_output = None
+    crossings_report = root / "qa_qc" / "crossing_screening_report.json"
+    if by_name.get(roads_source_name):
+        crossings = screen_crossings(
+            root, by_name[roads_source_name], terrain.drainage_paths, arcpy_adapter,
+            by_name.get(bridges_source_name) if bridges_source_name else None,
+            by_name.get(culverts_source_name) if culverts_source_name else None,
+            structure_search_distance,
+        )
+        crossings_output = crossings.screened_crossings
+    else:
+        crossings_report.write_text(
+            json.dumps({
+                "processed_at": datetime.now(timezone.utc).isoformat(),
+                "status": "REVIEW",
+                "roads_source": roads_source_name,
+                "screened_crossings": None,
+                "review_notes": (
+                    "REVIEW REQUIRED: road acquisition was unavailable, so road/drainage "
+                    "crossing screening was skipped. Rerun with Existing Map Layers and an "
+                    "approved road layer, or add a validated DOT/local road service."
+                ),
+            }, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
     response_units = None
     if land_cover_source_name and soil_group_source_name:
         land_cover_dataset = by_name.get(land_cover_source_name)
@@ -138,17 +167,31 @@ def run_complete_workflow(
             "bank_lines": None,
             "flow_paths": terrain.drainage_paths,
             "cross_sections": None,
-            "crossings": crossings.screened_crossings,
+            "crossings": crossings_output,
             "land_cover": response_units or (by_name.get(land_cover_source_name) if land_cover_source_name else None),
         },
     )
     qa_json, _ = generate_qa_package(root)
+    optional_failures = sorted({item.source_name for item in acquisition_failures} | set(failed_standard))
+    acquisition_messages = {
+        item.source_name: " ".join(str(item.message).split())[:300]
+        for item in acquisition_failures
+    }
+    optional_details = "; ".join(
+        f"{name}: {acquisition_messages.get(name, 'working dataset was not standardized')}"
+        for name in optional_failures
+    )
+    optional_note = (
+        " Optional sources unavailable and recorded for follow-up: " + optional_details + "."
+        if optional_failures else ""
+    )
     result = CompleteWorkflowResult(
         str(root), boundary_result.imported_boundary, len(acquired), len(standardized),
         str(root / "qa_qc" / "terrain_hydrology_report.json"),
-        str(root / "qa_qc" / "crossing_screening_report.json"), hec.package_root,
+        str(crossings_report), hec.package_root,
         str(qa_json), datetime.now(timezone.utc).isoformat(), "REVIEW",
-        "REVIEW REQUIRED: preliminary screening workflow; not final engineering approval or a runnable HEC-RAS model.",
+        ("REVIEW REQUIRED: preliminary screening workflow; not final engineering approval "
+         "or a runnable HEC-RAS model." + optional_note),
     )
     (root / "qa_qc" / "complete_workflow_report.json").write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
