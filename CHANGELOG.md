@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.4 - 2026-08-04
+
+- Fixed the automated toolbox workflow failing with an unexpected
+  `boundary_polygon_name` argument when ArcGIS Pro retained an older in-memory copy of the
+  workflow module from a previously opened release.
+- The toolbox now prioritizes its own extracted `src` directory, reloads the complete-workflow
+  orchestrator immediately before execution, and reports a clear restart instruction if
+  ArcGIS resolves the module from another extracted release.
+
 ## Manager UX consolidation
 
 - Added a KMZ-first automated workflow as the first toolbox entry, reducing the normal run
