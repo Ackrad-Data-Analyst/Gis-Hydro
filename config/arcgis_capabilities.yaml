@@ -1,0 +1,14 @@
+{
+  "review_notice": "REVIEW REQUIRED: tool licensing requirements must be checked against the deployed ArcGIS Pro version and SB Energy licensing before production release.",
+  "license_order": ["Basic", "Standard", "Advanced"],
+  "capabilities": [
+    {"name": "project_workspace", "minimum_license": "Basic", "extensions": [], "description": "Create project folders and a file geodatabase."},
+    {"name": "boundary_validation", "minimum_license": "Basic", "extensions": [], "description": "Inspect boundary geometry, spatial reference, extent, and feature count."},
+    {"name": "authoritative_source_planning", "minimum_license": "Basic", "extensions": [], "description": "Build a boundary-driven authoritative source plan."},
+    {"name": "vector_acquisition", "minimum_license": "Basic", "extensions": [], "description": "Query and store approved vector service data."},
+    {"name": "raster_acquisition", "minimum_license": "Basic", "extensions": [], "description": "Export approved image service data without analytical processing."},
+    {"name": "terrain_hydrology", "minimum_license": "Basic", "extensions": ["Spatial"], "description": "Run hydrology raster analysis such as flow direction and accumulation."},
+    {"name": "lidar_terrain_processing", "minimum_license": "Basic", "extensions": ["3D"], "description": "Process LAS/LiDAR terrain using 3D Analyst operations."},
+    {"name": "advanced_image_analysis", "minimum_license": "Basic", "extensions": ["ImageAnalyst"], "description": "Run Image Analyst-specific processing."}
+  ]
+}

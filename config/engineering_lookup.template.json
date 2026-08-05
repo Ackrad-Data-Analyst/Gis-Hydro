@@ -1,0 +1,11 @@
+{
+  "approval_status": "DRAFT",
+  "approved_by": "",
+  "approved_date": "",
+  "technical_basis": "REVIEW REQUIRED: cite the company-approved engineering standard and assumptions.",
+  "curve_number_condition": "",
+  "curve_numbers": {},
+  "mannings_n": {},
+  "infiltration_rates": {},
+  "notes": "Populate and approve this file before automated parameter assignment. Values are intentionally not invented."
+}
