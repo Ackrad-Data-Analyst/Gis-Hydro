@@ -35,14 +35,20 @@ without adding dependencies:
 For a normal new site, run **00 - START HERE > Automated Site Workflow - KMZ to Review
 Package**. In one dialog, choose the project name, parent projects folder, KML/KMZ,
 boundary polygon name, approved CRS, Imperial/Metric units, reviewed stream threshold,
-fill choice, and data mode. **Existing Map Layers** is the preferred manager-demo mode:
+fill choice, data mode, and HEC-RAS output goal. **Existing Map Layers** is the preferred manager-demo mode:
 it snapshots the DEM/roads and optional land-cover/soil layers from the current ArcGIS
 map. If exactly one current-map layer name looks like DEM/3DEP/Elevation, Roads/Streets,
 NLCD/LandCover, or Soils/HSG, the toolbox fills that layer automatically; ambiguous
 matches stay blank for operator review. **Authoritative Catalog** remains available for
 controlled service testing but should not be the only path for a manager demonstration.
 The automated tool creates the project file geodatabase and all implemented downstream
-review outputs.
+review outputs. If the operator selects **HEC-RAS-Ready Input Package**, ArcGIS prompts
+for bank lines, cross sections, structure geometry or a no-structure confirmation, approved
+terrain notes, Manning's n/roughness notes, flow and downstream boundary conditions,
+geometry review notes, HEC-RAS plan/geometry notes, calibration/reasonableness notes,
+and the engineer/reviewer name before the run
+continues. Blank required assumptions are shown in the ArcGIS dialog instead of being
+invented or failing later.
 
 Existing map image services are selected by layer name and clipped to the project boundary
 before they are copied. If ArcGIS would exceed an image-service row/column limit such as
@@ -78,6 +84,10 @@ Do not rerun a completed stage over existing outputs.
 8. **06 - Prepare Preliminary HEC-RAS Review Package:** export terrain and available vector
    candidates. Missing banks, cross sections, structures, rainfall, infiltration, or
    boundary conditions remain explicitly listed; they are not invented.
+   The package writes `qa_qc/hec_ras_readiness_report.json`. When the engineer supplies
+   all required HEC-RAS-ready fields and layers, or confirms a required structure layer is not applicable, it reports
+   `HEC_RAS_MODEL_INPUT_PACKAGE_READY_FOR_ENGINEER_REVIEW`; otherwise it reports
+   `NOT_RUNNABLE_HEC_RAS_MODEL` and lists exactly what is missing.
 9. **07 - Generate QA/QC Package:** retain the JSON and CSV index with the project.
 
 ## Engineer/GIS inputs that remain explicit
@@ -88,6 +98,16 @@ Do not rerun a completed stage over existing outputs.
 - pour points and snap distance when watersheds are requested;
 - structure search distance when known bridges/culverts are supplied;
 - final HEC-RAS geometry and hydraulic/hydrologic parameters.
+
+## USGS 3DEP bulk-download reference
+
+The standalone 3DEP example provided by the team is relevant to DEM reliability because
+it uses TNMAccess product downloads, paging, retries, safe ZIP extraction, tile
+conversion, mosaicking, and a manifest rather than depending only on image-service
+exports. The current integrated workflow already prefers existing map DEM layers and
+adaptive image-service snapshots; a production DEM acquisition module should adopt the
+TNMAccess tile-download pattern when a reviewed 1 m DEM mosaic is required and network
+policy permits it.
 
 ## Acceptance and troubleshooting
 

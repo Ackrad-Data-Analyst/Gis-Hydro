@@ -17,6 +17,25 @@
   of crashing the entire workflow before DEM results and QA can be reviewed.
 - Made Existing Map Layers the default one-dialog data mode and added conservative current-map
   layer auto-detection for unique DEM, roads, land-cover, and soil/HSG layer names.
+- Fixed HEC-RAS review packaging so raster review inputs, including combined hydrologic
+  response units, are copied as raster snapshots instead of being forced through GeoJSON
+  feature export. Raster/vector export fallbacks are recorded as REVIEW REQUIRED instead
+  of crashing the manager demonstration.
+- Made hydrologic response-unit combination fail safely as a REVIEW REQUIRED note when
+  optional land-cover/soil rasters cannot be combined, and made repeated HEC review-package
+  exports create a new suffixed output folder instead of overwriting or stopping a rerun.
+- Added an explicit HEC-RAS readiness report and manifest fields that classify the package as
+  `NOT_RUNNABLE_HEC_RAS_MODEL` until required engineering inputs such as bank lines, cross
+  sections, flow paths, structures, Manning values, flow/boundary conditions, and reviewer
+  signoff are supplied.
+- Added HEC-RAS-ready input-package prompts to the automated ArcGIS tool so missing bank
+  lines, cross sections, structure geometry or no-structure confirmation, terrain approval,
+  Manning's n/roughness, flow/boundary conditions, geometry review notes, model-plan notes,
+  calibration/reasonableness notes, and reviewer name are requested in the dialog before
+  execution instead of failing downstream or being invented.
+- Reviewed the team-provided USGS 3DEP bulk-download toolbox pattern and documented where
+  its TNMAccess paging/retry/tile-mosaic approach should be adopted for production DEM
+  acquisition when existing map DEM layers are not sufficient.
 
 ## 0.3.4 - 2026-08-04
 

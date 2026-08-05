@@ -34,6 +34,7 @@ class CompleteWorkflowResult:
     completed_at: str
     status: str
     review_notes: str
+    hec_ras_readiness: str
     def to_dict(self) -> dict[str, object]: return asdict(self)
 
 
@@ -58,6 +59,11 @@ def run_complete_workflow(
     unit_system: str = "Imperial",
     soil_group_source_name: str | None = None,
     existing_map_sources: dict[str, str] | None = None,
+    hec_model_inputs: dict[str, str | None] | None = None,
+    hec_bank_lines: str | None = None,
+    hec_flow_paths: str | None = None,
+    hec_cross_sections: str | None = None,
+    hec_hydraulic_structures: str | None = None,
 ) -> CompleteWorkflowResult:
     """Run all implemented operations and stop at the first unsafe condition."""
     units = unit_preferences(unit_system)
@@ -153,23 +159,44 @@ def run_complete_workflow(
             encoding="utf-8",
         )
     response_units = None
+    response_note = ""
     if land_cover_source_name and soil_group_source_name:
         land_cover_dataset = by_name.get(land_cover_source_name)
         soil_group_dataset = by_name.get(soil_group_source_name)
         if land_cover_dataset and soil_group_dataset:
-            response_units = combine_land_cover_soils(
-                root, land_cover_dataset, soil_group_dataset, arcpy_adapter
-            ).combined_raster
+            try:
+                response_units = combine_land_cover_soils(
+                    root, land_cover_dataset, soil_group_dataset, arcpy_adapter
+                ).combined_raster
+            except Exception as error:
+                response_note = (
+                    " Hydrologic response unit combination was skipped and marked REVIEW REQUIRED: "
+                    + " ".join(str(error).split())[:300]
+                    + "."
+                )
+                (root / "qa_qc" / "hydrologic_response_report.json").write_text(
+                    json.dumps({
+                        "processed_at": datetime.now(timezone.utc).isoformat(),
+                        "status": "REVIEW",
+                        "land_cover": land_cover_dataset,
+                        "soil_groups": soil_group_dataset,
+                        "combined_raster": None,
+                        "review_notes": response_note.strip(),
+                    }, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
     hec = build_hec_ras_review_package(
         root, terrain.filled_dem or by_name[dem_source_name], arcpy_adapter,
         {
             "stream_centerlines": terrain.drainage_paths,
-            "bank_lines": None,
-            "flow_paths": terrain.drainage_paths,
-            "cross_sections": None,
+            "bank_lines": hec_bank_lines,
+            "flow_paths": hec_flow_paths or terrain.drainage_paths,
+            "cross_sections": hec_cross_sections,
             "crossings": crossings_output,
+            "hydraulic_structures": hec_hydraulic_structures,
             "land_cover": response_units or (by_name.get(land_cover_source_name) if land_cover_source_name else None),
         },
+        engineer_inputs=hec_model_inputs,
     )
     qa_json, _ = generate_qa_package(root)
     optional_failures = sorted({item.source_name for item in acquisition_failures} | set(failed_standard))
@@ -191,7 +218,8 @@ def run_complete_workflow(
         str(crossings_report), hec.package_root,
         str(qa_json), datetime.now(timezone.utc).isoformat(), "REVIEW",
         ("REVIEW REQUIRED: preliminary screening workflow; not final engineering approval "
-         "or a runnable HEC-RAS model." + optional_note),
+         "or a runnable HEC-RAS model." + optional_note + response_note),
+        getattr(hec, "ras_readiness", "NOT_RUNNABLE_HEC_RAS_MODEL"),
     )
     (root / "qa_qc" / "complete_workflow_report.json").write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
