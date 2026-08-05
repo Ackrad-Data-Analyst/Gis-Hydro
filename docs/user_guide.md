@@ -35,14 +35,20 @@ without adding dependencies:
 For a normal new site, run **00 - START HERE > Automated Site Workflow - KMZ to Review
 Package**. In one dialog, choose the project name, parent projects folder, KML/KMZ,
 boundary polygon name, approved CRS, Imperial/Metric units, reviewed stream threshold,
-fill choice, and data mode. **Authoritative Catalog** clips configured services;
-**Existing Map Layers** snapshots the DEM/roads and optional land-cover/soil layers you
-explicitly select from the current ArcGIS map. The automated tool creates the project file
-geodatabase and all implemented downstream review outputs.
+fill choice, and data mode. **Existing Map Layers** is the preferred manager-demo mode:
+it snapshots the DEM/roads and optional land-cover/soil layers from the current ArcGIS
+map. If exactly one current-map layer name looks like DEM/3DEP/Elevation, Roads/Streets,
+NLCD/LandCover, or Soils/HSG, the toolbox fills that layer automatically; ambiguous
+matches stay blank for operator review. **Authoritative Catalog** remains available for
+controlled service testing but should not be the only path for a manager demonstration.
+The automated tool creates the project file geodatabase and all implemented downstream
+review outputs.
 
 Existing map image services are selected by layer name and clipped to the project boundary
-before they are copied. This avoids ArcGIS error `001491` caused by validating or copying
-the full nationwide image service beyond its row/column limit.
+before they are copied. If ArcGIS would exceed an image-service row/column limit such as
+`001491`, the workflow temporarily increases only the snapshot cell size enough to keep
+the service request under the limit and records that coarser preview resolution as
+**REVIEW REQUIRED**. Do not treat this as final DEM or land-cover engineering accuracy.
 
 If an optional catalog service such as land cover or roads is unavailable, the automated
 run preserves completed terrain and QA outputs, records the skipped stage as **REVIEW

@@ -49,6 +49,90 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _service_dimension_limit(source_name: str) -> int:
+    """Return a conservative image-service request limit for preview snapshots."""
+    lowered = source_name.lower()
+    if "3dep" in lowered or "dem" in lowered or "elevation" in lowered:
+        return 8000
+    if "nlcd" in lowered or "land_cover" in lowered or "landcover" in lowered:
+        return 20000
+    if "soil" in lowered or "ssurgo" in lowered or "hydrologic_group" in lowered:
+        return 30000
+    return 8000
+
+
+def _adaptive_cell_size(extent: Any, description: Any, limit: int) -> float | None:
+    """Return a coarser cell size when a service request would exceed size limits.
+
+    This is a REVIEW REQUIRED preview safeguard.  It prevents ArcGIS image-service
+    errors for broad project boundaries, but it does not approve the resulting
+    resolution for final engineering use.
+    """
+    width = abs(float(extent.XMax) - float(extent.XMin))
+    height = abs(float(extent.YMax) - float(extent.YMin))
+    native_width = getattr(description, "meanCellWidth", None)
+    native_height = getattr(description, "meanCellHeight", None)
+    if not native_width or not native_height or width <= 0 or height <= 0:
+        return None
+    native_width = abs(float(native_width))
+    native_height = abs(float(native_height))
+    native_columns = width / native_width
+    native_rows = height / native_height
+    if native_columns <= limit and native_rows <= limit:
+        return None
+    # Keep a small margin under the service limit so floating-point rounding does
+    # not request one row/column too many.
+    safe_limit = max(limit - 10, 1)
+    return max(native_width, native_height, width / safe_limit, height / safe_limit)
+
+
+def _clip_raster_snapshot(
+    arcpy_adapter: Any,
+    raster_input: str,
+    boundary: str,
+    output: Path,
+    source_name: str,
+) -> str | None:
+    """Clip an image service to the boundary, adapting cell size if needed."""
+    extent = arcpy_adapter.Describe(boundary).extent
+    rectangle = f"{extent.XMin} {extent.YMin} {extent.XMax} {extent.YMax}"
+    raster_description = arcpy_adapter.Describe(raster_input)
+    adjusted_cell_size = _adaptive_cell_size(
+        extent, raster_description, _service_dimension_limit(source_name)
+    )
+    if adjusted_cell_size is None:
+        arcpy_adapter.management.Clip(
+            raster_input, rectangle, str(output), boundary,
+            "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+        )
+        return None
+
+    env_manager = getattr(arcpy_adapter, "EnvManager", None)
+    if callable(env_manager):
+        with env_manager(cellSize=adjusted_cell_size):
+            arcpy_adapter.management.Clip(
+                raster_input, rectangle, str(output), boundary,
+                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+            )
+    else:
+        env = getattr(arcpy_adapter, "env", None)
+        old_cell_size = getattr(env, "cellSize", None) if env is not None else None
+        if env is not None:
+            env.cellSize = adjusted_cell_size
+        try:
+            arcpy_adapter.management.Clip(
+                raster_input, rectangle, str(output), boundary,
+                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+            )
+        finally:
+            if env is not None:
+                env.cellSize = old_cell_size
+    return (
+        f"Image-service request was clipped to the boundary with temporary cellSize "
+        f"{adjusted_cell_size:.6g} to stay within service row/column limits; "
+        "resolution is REVIEW REQUIRED."
+    )
+
 def _load_workspace(project_root: Path) -> tuple[Path, Path, str]:
     root = project_root.expanduser().resolve()
     manifest_path = root / "qa_qc" / "workspace_manifest.json"
@@ -157,8 +241,6 @@ def acquire_catalog_sources(
                     working_output = clipped
             elif source["operation"] == "extract":
                 original_output = source_folder / f"{safe_name}.tif"
-                extent = arcpy_adapter.Describe(boundary).extent
-                rectangle = f"{extent.XMin} {extent.YMin} {extent.XMax} {extent.YMax}"
                 raster_input = source["rest_url"]
                 configured_filter = source.get("filter", "").strip()
                 if configured_filter:
@@ -166,9 +248,8 @@ def acquire_catalog_sources(
                     arcpy_adapter.management.MakeImageServerLayer(
                         source["rest_url"], raster_input, where_clause=configured_filter
                     )
-                arcpy_adapter.management.Clip(
-                    raster_input, rectangle, str(original_output), boundary,
-                    "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+                cell_size_note = _clip_raster_snapshot(
+                    arcpy_adapter, raster_input, boundary, original_output, source["name"]
                 )
                 working_output = str(geodatabase / safe_name)
                 if arcpy_adapter.Exists(working_output):
@@ -190,7 +271,8 @@ def acquire_catalog_sources(
                 resolution_or_scale=resolution, coverage="INTERSECTS_BOUNDARY",
                 status="REVIEW",
                 message=("Acquisition completed. Coverage percentage, currency, schema, datum, "
-                         "resolution, and engineering suitability are REVIEW REQUIRED."),
+                         "resolution, and engineering suitability are REVIEW REQUIRED."
+                         + (f" {cell_size_note}" if source["operation"] == "extract" and cell_size_note else "")),
             )
         except Exception as error:
             result = AcquisitionResult(
@@ -222,8 +304,10 @@ def stage_existing_map_sources(
 ) -> list[AcquisitionResult]:
     """Snapshot explicitly selected map layers so they can replace network acquisition.
 
-    Map symbology is not treated as provenance. Each selected dataset is copied to the
-    project geodatabase and recorded in the same manifest used by standardization.
+    Map symbology is not treated as provenance. Each selected dataset is clipped or
+    copied to the project geodatabase and recorded in the same manifest used by
+    standardization. Per-layer failures are returned as FAIL records so optional
+    layers do not discard completed DEM work.
     """
     root, geodatabase, boundary = _load_workspace(project_root)
     requested_at = datetime.now(timezone.utc).isoformat()
@@ -231,39 +315,54 @@ def stage_existing_map_sources(
     for source_name, dataset in layer_roles.items():
         safe_name = _safe_name(source_name)
         output = str(geodatabase / safe_name)
-        if arcpy_adapter.Exists(output):
-            raise FileExistsError(f"Staged map dataset exists and will not be overwritten: {output}")
-        description = arcpy_adapter.Describe(dataset)
-        data_type = str(getattr(description, "dataType", ""))
-        if "raster" in data_type.lower():
-            working_root = root / "data" / "working"
-            working_root.mkdir(parents=True, exist_ok=True)
-            clipped_snapshot = working_root / f"{safe_name}_map_clip.tif"
-            if clipped_snapshot.exists():
-                raise FileExistsError(f"Clipped map snapshot exists and will not be overwritten: {clipped_snapshot}")
-            extent = arcpy_adapter.Describe(boundary).extent
-            rectangle = f"{extent.XMin} {extent.YMin} {extent.XMax} {extent.YMax}"
-            arcpy_adapter.management.Clip(
-                dataset, rectangle, str(clipped_snapshot), boundary,
-                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
-            )
-            arcpy_adapter.management.CopyRaster(str(clipped_snapshot), output)
-        else:
-            arcpy_adapter.analysis.Clip(dataset, boundary, output)
-        crs, resolution = _describe_output(arcpy_adapter, output)
-        results.append(AcquisitionResult(
-            source_name=source_name, category="Existing approved map layer",
-            agency="Supplied ArcGIS map", service_url=str(dataset), operation="snapshot_from_map",
-            requested_at=requested_at, completed_at=datetime.now(timezone.utc).isoformat(),
-            query_parameters={"boundary": boundary, "selection": "explicit operator layer role"},
-            original_output=str(clipped_snapshot) if "raster" in data_type.lower() else None,
-            working_output=output,
-            sha256=_sha256(clipped_snapshot) if "raster" in data_type.lower() else None,
-            coordinate_system=crs,
-            resolution_or_scale=resolution, coverage="CLIPPED_OR_COPIED_FOR_PROJECT", status="REVIEW",
-            message=("Map layer was clipped to the project boundary before snapshotting; ownership, "
-                     "currency, license, and engineering suitability are REVIEW REQUIRED."),
-        ))
+        clipped_snapshot: Path | None = None
+        data_type = ""
+        try:
+            if arcpy_adapter.Exists(output):
+                raise FileExistsError(f"Staged map dataset exists and will not be overwritten: {output}")
+            description = arcpy_adapter.Describe(dataset)
+            data_type = str(getattr(description, "dataType", ""))
+            if "raster" in data_type.lower():
+                working_root = root / "data" / "working"
+                working_root.mkdir(parents=True, exist_ok=True)
+                clipped_snapshot = working_root / f"{safe_name}_map_clip.tif"
+                if clipped_snapshot.exists():
+                    raise FileExistsError(
+                        f"Clipped map snapshot exists and will not be overwritten: {clipped_snapshot}"
+                    )
+                cell_size_note = _clip_raster_snapshot(
+                    arcpy_adapter, dataset, boundary, clipped_snapshot, source_name
+                )
+                arcpy_adapter.management.CopyRaster(str(clipped_snapshot), output)
+            else:
+                cell_size_note = None
+                arcpy_adapter.analysis.Clip(dataset, boundary, output)
+            crs, resolution = _describe_output(arcpy_adapter, output)
+            results.append(AcquisitionResult(
+                source_name=source_name, category="Existing approved map layer",
+                agency="Supplied ArcGIS map", service_url=str(dataset), operation="snapshot_from_map",
+                requested_at=requested_at, completed_at=datetime.now(timezone.utc).isoformat(),
+                query_parameters={"boundary": boundary, "selection": "explicit operator layer role"},
+                original_output=str(clipped_snapshot) if clipped_snapshot else None,
+                working_output=output,
+                sha256=_sha256(clipped_snapshot) if clipped_snapshot else None,
+                coordinate_system=crs,
+                resolution_or_scale=resolution, coverage="CLIPPED_OR_COPIED_FOR_PROJECT", status="REVIEW",
+                message=("Map layer was clipped to the project boundary before snapshotting; ownership, "
+                         "currency, license, and engineering suitability are REVIEW REQUIRED."
+                         + (f" {cell_size_note}" if cell_size_note else "")),
+            ))
+        except Exception as error:
+            results.append(AcquisitionResult(
+                source_name=source_name, category="Existing approved map layer",
+                agency="Supplied ArcGIS map", service_url=str(dataset), operation="snapshot_from_map",
+                requested_at=requested_at, completed_at=datetime.now(timezone.utc).isoformat(),
+                query_parameters={"boundary": boundary, "selection": "explicit operator layer role"},
+                original_output=str(clipped_snapshot) if clipped_snapshot and clipped_snapshot.exists() else None,
+                working_output=output, sha256=None, coordinate_system=None, resolution_or_scale=None,
+                coverage="UNKNOWN", status="FAIL",
+                message=("Existing map layer snapshot failed; REVIEW REQUIRED. " + str(error)),
+            ))
     report = root / "qa_qc" / f"acquisition_manifest_{requested_at.replace(':', '').replace('+', '_')}.json"
     report.write_text(json.dumps([item.to_dict() for item in results], indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return results

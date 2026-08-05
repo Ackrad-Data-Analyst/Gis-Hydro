@@ -62,6 +62,32 @@ def _current_map_layer_names():
     return rasters, features
 
 
+def _choose_unique_layer(layer_names, keywords):
+    """Choose one current-map layer by name without guessing among multiple matches."""
+    matches = []
+    for name in layer_names:
+        lowered = name.lower().replace("_", " ")
+        if any(keyword in lowered for keyword in keywords):
+            matches.append(name)
+    return matches[0] if len(matches) == 1 else None
+
+
+def _auto_detect_map_sources():
+    """Return likely DEM/road/land-cover/soil layers from the current map.
+
+    Auto-detection is intentionally conservative: it only fills a role when exactly
+    one layer name matches that role.  Ambiguous or missing roles remain explicit
+    operator inputs.
+    """
+    raster_names, feature_names = _current_map_layer_names()
+    return {
+        "USGS_3DEP_DEM": _choose_unique_layer(raster_names, ("3dep", "dem", "elevation")),
+        "USGS_TNM_Roads": _choose_unique_layer(feature_names, ("road", "roads", "street")),
+        "NLCD_Land_Cover": _choose_unique_layer(raster_names, ("nlcd", "land cover", "landcover")),
+        "SSURGO_Hydrologic_Group": _choose_unique_layer(raster_names, ("soil", "ssurgo", "hydrologic group", "hsg")),
+    }
+
+
 class Toolbox:
     def __init__(self):
         self.label = "Site Hydrology Workflow"
@@ -109,7 +135,7 @@ class RunCompleteSiteWorkflow:
         parameters[5].filter.list = ["Imperial", "Metric"]
         parameters[5].value = "Imperial"
         parameters[6].filter.list = ["Authoritative Catalog", "Existing Map Layers"]
-        parameters[6].value = "Authoritative Catalog"
+        parameters[6].value = "Existing Map Layers"
         parameters[12].value = True
         parameters[13].value = str(REPOSITORY_ROOT / "config" / "authoritative_sources.yaml")
         parameters[14].value = True
@@ -132,11 +158,16 @@ class RunCompleteSiteWorkflow:
             parameters[index].enabled = use_map
         if use_map:
             raster_names, feature_names = _current_map_layer_names()
+            auto_sources = _auto_detect_map_sources()
             for index in (7, 9, 10):
                 if raster_names:
                     parameters[index].filter.list = raster_names
             if feature_names:
                 parameters[8].filter.list = feature_names
+            auto_defaults = {7: "USGS_3DEP_DEM", 8: "USGS_TNM_Roads", 9: "NLCD_Land_Cover", 10: "SSURGO_Hydrologic_Group"}
+            for index, role in auto_defaults.items():
+                if not parameters[index].valueAsText and auto_sources.get(role):
+                    parameters[index].value = auto_sources[role]
         parameters[13].enabled = not use_map
     def updateMessages(self, parameters):
         source_text = parameters[2].valueAsText
@@ -148,24 +179,34 @@ class RunCompleteSiteWorkflow:
             except ValueError as exc:
                 parameters[2].setErrorMessage(str(exc))
         if parameters[6].valueAsText == "Existing Map Layers":
-            if not parameters[7].valueAsText:
-                parameters[7].setErrorMessage("Select the approved DEM layer from the current map.")
-            if not parameters[8].valueAsText:
-                parameters[8].setErrorMessage("Select the approved road layer from the current map.")
+            auto_sources = _auto_detect_map_sources()
+            if not parameters[7].valueAsText and not auto_sources.get("USGS_3DEP_DEM"):
+                parameters[7].setErrorMessage("Select the approved DEM layer from the current map, or add one layer named like DEM/3DEP/Elevation.")
+            if not parameters[8].valueAsText and not auto_sources.get("USGS_TNM_Roads"):
+                parameters[8].setErrorMessage("Select the approved road layer from the current map, or add one layer named like Roads/Streets.")
     def execute(self, parameters, messages):
         run_complete_workflow = _load_complete_workflow_runner()
         use_map = parameters[6].valueAsText == "Existing Map Layers"
         sources = [] if use_map else load_source_catalog(Path(parameters[13].valueAsText))
         map_sources = None
         if use_map:
+            auto_sources = _auto_detect_map_sources()
+            dem_layer = parameters[7].valueAsText or auto_sources.get("USGS_3DEP_DEM")
+            roads_layer = parameters[8].valueAsText or auto_sources.get("USGS_TNM_Roads")
+            if not dem_layer:
+                raise ValueError("Existing Map Layers mode needs an approved DEM layer in the current map. Add/select a layer named like DEM, 3DEP, or Elevation.")
+            if not roads_layer:
+                raise ValueError("Existing Map Layers mode needs an approved roads layer in the current map. Add/select a layer named like Roads or Streets.")
             map_sources = {
-                "USGS_3DEP_DEM": parameters[7].valueAsText,
-                "USGS_TNM_Roads": parameters[8].valueAsText,
+                "USGS_3DEP_DEM": dem_layer,
+                "USGS_TNM_Roads": roads_layer,
             }
-            if parameters[9].valueAsText:
-                map_sources["NLCD_Land_Cover"] = parameters[9].valueAsText
-            if parameters[10].valueAsText:
-                map_sources["SSURGO_Hydrologic_Group"] = parameters[10].valueAsText
+            land_cover_layer = parameters[9].valueAsText or auto_sources.get("NLCD_Land_Cover")
+            soils_layer = parameters[10].valueAsText or auto_sources.get("SSURGO_Hydrologic_Group")
+            if land_cover_layer:
+                map_sources["NLCD_Land_Cover"] = land_cover_layer
+            if soils_layer:
+                map_sources["SSURGO_Hydrologic_Group"] = soils_layer
         result = run_complete_workflow(
             parameters[0].valueAsText, Path(parameters[1].valueAsText), parameters[2].valueAsText,
             parameters[4].value, sources, "USGS_3DEP_DEM", "USGS_TNM_Roads",

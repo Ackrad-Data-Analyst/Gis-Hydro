@@ -197,6 +197,57 @@ class ArcGISToolboxTests(unittest.TestCase):
         self.assertEqual(parameters[9].datatype, "GPString")
         self.assertEqual(parameters[10].datatype, "GPString")
 
+    def test_existing_map_mode_auto_detects_current_map_layers_by_name(self):
+        class _Map:
+            def listLayers(self):
+                return [
+                    types.SimpleNamespace(name="3DEPElevation", isRasterLayer=True, isFeatureLayer=False),
+                    types.SimpleNamespace(name="Primary Roads", isRasterLayer=False, isFeatureLayer=True),
+                    types.SimpleNamespace(name="USA NLCD Annual LandCover", isRasterLayer=True, isFeatureLayer=False),
+                    types.SimpleNamespace(name="USA Soils Hydrologic Group", isRasterLayer=True, isFeatureLayer=False),
+                ]
+
+        fake_arcpy = types.SimpleNamespace(
+            Parameter=_Parameter,
+            mp=types.SimpleNamespace(ArcGISProject=lambda value: types.SimpleNamespace(activeMap=_Map())),
+        )
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_auto_map_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+
+        parameters = module.RunCompleteSiteWorkflow().getParameterInfo()
+        parameters[6].value = "Existing Map Layers"
+        module.RunCompleteSiteWorkflow().updateParameters(parameters)
+
+        self.assertEqual(parameters[7].value, "3DEPElevation")
+        self.assertEqual(parameters[8].value, "Primary Roads")
+        self.assertEqual(parameters[9].value, "USA NLCD Annual LandCover")
+        self.assertEqual(parameters[10].value, "USA Soils Hydrologic Group")
+
+    def test_existing_map_auto_detect_refuses_ambiguous_dem_layers(self):
+        class _Map:
+            def listLayers(self):
+                return [
+                    types.SimpleNamespace(name="3DEPElevation", isRasterLayer=True, isFeatureLayer=False),
+                    types.SimpleNamespace(name="Backup DEM", isRasterLayer=True, isFeatureLayer=False),
+                ]
+
+        fake_arcpy = types.SimpleNamespace(
+            Parameter=_Parameter,
+            mp=types.SimpleNamespace(ArcGISProject=lambda value: types.SimpleNamespace(activeMap=_Map())),
+        )
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_ambiguous_map_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+
+        self.assertIsNone(module._auto_detect_map_sources()["USGS_3DEP_DEM"])
+
 
 if __name__ == "__main__":
     unittest.main()

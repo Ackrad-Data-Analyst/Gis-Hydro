@@ -11,6 +11,12 @@
 - Added actionable DEM failure messages and regression coverage for partial catalog outages.
 - Avoided ArcGIS image-service error 001491 in Existing Map Layers mode by using map-layer
   name selectors and clipping remote rasters to the project boundary before CopyRaster.
+- Added adaptive REVIEW REQUIRED raster snapshot cell-size control for broad boundaries
+  that still exceed image-service row/column limits after clipping.
+- Recorded existing-map optional layer snapshot failures as acquisition FAIL records instead
+  of crashing the entire workflow before DEM results and QA can be reviewed.
+- Made Existing Map Layers the default one-dialog data mode and added conservative current-map
+  layer auto-detection for unique DEM, roads, land-cover, and soil/HSG layer names.
 
 ## 0.3.4 - 2026-08-04
 
