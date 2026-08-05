@@ -61,6 +61,28 @@ def _service_dimension_limit(source_name: str) -> int:
     return 8000
 
 
+def _extent_width_height(extent: Any) -> tuple[float, float]:
+    """Return positive extent width/height without assuming units."""
+    width = abs(float(extent.XMax) - float(extent.XMin))
+    height = abs(float(extent.YMax) - float(extent.YMin))
+    return width, height
+
+
+def _fallback_cell_size(extent: Any, limit: int, multiplier: float = 1.0) -> float | None:
+    """Return a cell size based only on boundary extent and service limits.
+
+    ArcGIS image-service Describe objects sometimes omit reliable native cell-size
+    values.  In that case, calculate a conservative preview cell size directly from
+    the output extent so Clip can stay below the service row/column cap instead of
+    failing before a review package is created.
+    """
+    width, height = _extent_width_height(extent)
+    if width <= 0 or height <= 0:
+        return None
+    safe_limit = max(limit - 10, 1)
+    return max(width / safe_limit, height / safe_limit) * multiplier
+
+
 def _adaptive_cell_size(extent: Any, description: Any, limit: int) -> float | None:
     """Return a coarser cell size when a service request would exceed size limits.
 
@@ -68,22 +90,69 @@ def _adaptive_cell_size(extent: Any, description: Any, limit: int) -> float | No
     errors for broad project boundaries, but it does not approve the resulting
     resolution for final engineering use.
     """
-    width = abs(float(extent.XMax) - float(extent.XMin))
-    height = abs(float(extent.YMax) - float(extent.YMin))
+    width, height = _extent_width_height(extent)
     native_width = getattr(description, "meanCellWidth", None)
     native_height = getattr(description, "meanCellHeight", None)
     if not native_width or not native_height or width <= 0 or height <= 0:
-        return None
+        return _fallback_cell_size(extent, limit)
     native_width = abs(float(native_width))
     native_height = abs(float(native_height))
     native_columns = width / native_width
     native_rows = height / native_height
     if native_columns <= limit and native_rows <= limit:
         return None
-    # Keep a small margin under the service limit so floating-point rounding does
-    # not request one row/column too many.
-    safe_limit = max(limit - 10, 1)
-    return max(native_width, native_height, width / safe_limit, height / safe_limit)
+    fallback = _fallback_cell_size(extent, limit)
+    if fallback is None:
+        return max(native_width, native_height)
+    return max(native_width, native_height, fallback)
+
+
+def _is_image_service_size_error(error: Exception) -> bool:
+    text = str(error).lower()
+    return (
+        "size limits of the image service" in text
+        or "maximum number of rows and columns" in text
+        or "001491" in text
+    )
+
+
+def _run_clip_with_optional_cell_size(
+    arcpy_adapter: Any,
+    raster_input: str,
+    rectangle: str,
+    output: Path,
+    boundary: str,
+    cell_size: float | None,
+) -> None:
+    """Run ArcGIS Clip, optionally forcing an environment cell size."""
+    if cell_size is None:
+        arcpy_adapter.management.Clip(
+            raster_input, rectangle, str(output), boundary,
+            "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+        )
+        return
+
+    env_manager = getattr(arcpy_adapter, "EnvManager", None)
+    if callable(env_manager):
+        with env_manager(cellSize=cell_size):
+            arcpy_adapter.management.Clip(
+                raster_input, rectangle, str(output), boundary,
+                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+            )
+        return
+
+    env = getattr(arcpy_adapter, "env", None)
+    old_cell_size = getattr(env, "cellSize", None) if env is not None else None
+    if env is not None:
+        env.cellSize = cell_size
+    try:
+        arcpy_adapter.management.Clip(
+            raster_input, rectangle, str(output), boundary,
+            "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+        )
+    finally:
+        if env is not None:
+            env.cellSize = old_cell_size
 
 
 def _clip_raster_snapshot(
@@ -93,44 +162,39 @@ def _clip_raster_snapshot(
     output: Path,
     source_name: str,
 ) -> str | None:
-    """Clip an image service to the boundary, adapting cell size if needed."""
+    """Clip an image service to the boundary, retrying size-limit failures safely."""
     extent = arcpy_adapter.Describe(boundary).extent
     rectangle = f"{extent.XMin} {extent.YMin} {extent.XMax} {extent.YMax}"
     raster_description = arcpy_adapter.Describe(raster_input)
-    adjusted_cell_size = _adaptive_cell_size(
-        extent, raster_description, _service_dimension_limit(source_name)
-    )
-    if adjusted_cell_size is None:
-        arcpy_adapter.management.Clip(
-            raster_input, rectangle, str(output), boundary,
-            "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
-        )
-        return None
+    limit = _service_dimension_limit(source_name)
+    adjusted_cell_size = _adaptive_cell_size(extent, raster_description, limit)
+    attempted_cell_sizes = [adjusted_cell_size]
+    fallback_base = _fallback_cell_size(extent, limit)
+    if fallback_base is not None:
+        attempted_cell_sizes.extend(fallback_base * multiplier for multiplier in (2, 5, 10, 20))
 
-    env_manager = getattr(arcpy_adapter, "EnvManager", None)
-    if callable(env_manager):
-        with env_manager(cellSize=adjusted_cell_size):
-            arcpy_adapter.management.Clip(
-                raster_input, rectangle, str(output), boundary,
-                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
-            )
-    else:
-        env = getattr(arcpy_adapter, "env", None)
-        old_cell_size = getattr(env, "cellSize", None) if env is not None else None
-        if env is not None:
-            env.cellSize = adjusted_cell_size
+    last_error: Exception | None = None
+    for cell_size in attempted_cell_sizes:
         try:
-            arcpy_adapter.management.Clip(
-                raster_input, rectangle, str(output), boundary,
-                "", "ClippingGeometry", "NO_MAINTAIN_EXTENT",
+            _run_clip_with_optional_cell_size(
+                arcpy_adapter, raster_input, rectangle, output, boundary, cell_size
             )
-        finally:
-            if env is not None:
-                env.cellSize = old_cell_size
-    return (
-        f"Image-service request was clipped to the boundary with temporary cellSize "
-        f"{adjusted_cell_size:.6g} to stay within service row/column limits; "
-        "resolution is REVIEW REQUIRED."
+            if cell_size is None:
+                return None
+            return (
+                f"Image-service request was clipped to the boundary with temporary cellSize "
+                f"{cell_size:.6g} to stay within service row/column limits; "
+                "resolution is REVIEW REQUIRED."
+            )
+        except Exception as error:
+            last_error = error
+            if not _is_image_service_size_error(error):
+                raise
+
+    raise RuntimeError(
+        "Image-service clip exceeded row/column limits even after adaptive cell-size retries. "
+        "Use a smaller AOI, a local DEM/raster, or a pre-clipped map layer. Last ArcGIS error: "
+        f"{last_error}"
     )
 
 def _load_workspace(project_root: Path) -> tuple[Path, Path, str]:

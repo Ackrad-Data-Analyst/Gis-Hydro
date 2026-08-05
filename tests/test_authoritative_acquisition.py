@@ -72,6 +72,21 @@ class _SizeLimitedArcPy(_ArcPy):
         )
 
 
+
+class _MissingCellSizeArcPy(_SizeLimitedArcPy):
+    def Describe(self, value):
+        if value == "boundary":
+            return types.SimpleNamespace(
+                extent=types.SimpleNamespace(XMin=0, YMin=0, XMax=100000, YMax=100000),
+                spatialReference=types.SimpleNamespace(name="Synthetic CRS"),
+                dataType="FeatureClass",
+            )
+        return types.SimpleNamespace(
+            extent=types.SimpleNamespace(XMin=0, YMin=0, XMax=100000, YMax=100000),
+            spatialReference=types.SimpleNamespace(name="Synthetic CRS"),
+            dataType="RasterDataset",
+        )
+
 class _SelectiveFailureManagement(_Management):
     def Clip(self, url, rectangle, output, *args):
         if "bad_land_cover" in str(url):
@@ -191,6 +206,17 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             self.assertTrue(Path(results[0].original_output).is_file())
             self.assertTrue(results[0].sha256)
             self.assertEqual(len(list((root / "qa_qc").glob("acquisition_manifest_*.json"))), 1)
+
+
+    def test_image_service_size_limit_retries_when_native_cell_size_is_missing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            adapter = _MissingCellSizeArcPy()
+            results = acquire_catalog_sources(root, [_source("USGS_3DEP_DEM", "extract")], adapter)
+            self.assertEqual(results[0].status, "REVIEW")
+            self.assertIn("temporary cellSize", results[0].message)
+            self.assertTrue(results[0].sha256)
+            self.assertTrue(any(size is not None for size in adapter.clip_cell_sizes))
 
     def test_existing_map_raster_uses_adaptive_cell_size_for_large_image_services(self):
         with tempfile.TemporaryDirectory() as temp:

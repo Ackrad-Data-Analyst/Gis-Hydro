@@ -2,6 +2,8 @@
 
 ## 0.3.5
 
+- Hardened DEM/image-service clipping after Pegasus8 failures: raster snapshots now retry ArcGIS Clip with boundary-derived adaptive cell sizes even when ArcGIS does not report reliable native cell-size metadata, covering both Catalog Services and Existing Map Layers mode.
+
 - Added a Jeremy-facing workflow progress document that maps the prototype to Adolfo's
   seven-step Automated Hydro Workflow flowchart.
 - Renamed the one-dialog data source choice from authoritative-only wording to
