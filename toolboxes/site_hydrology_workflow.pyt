@@ -129,6 +129,19 @@ class RunCompleteSiteWorkflow:
             ("Fill Depressions (REVIEW REQUIRED)", "fill_dem", "GPBoolean", "Required"),
             ("Authoritative Source Catalog", "source_catalog", "DEFile", "Required"),
             ("Add Elevation and Boundary Outline to Current Map", "add_to_map", "GPBoolean", "Required"),
+            ("HEC-RAS Output Goal", "hec_output_goal", "GPString", "Required"),
+            ("HEC-RAS Bank Lines (required for HEC-RAS-ready package)", "hec_bank_lines", "GPString", "Optional"),
+            ("HEC-RAS Flow Paths (optional; drainage paths used if blank)", "hec_flow_paths", "GPString", "Optional"),
+            ("HEC-RAS Cross Sections (required for HEC-RAS-ready package)", "hec_cross_sections", "GPString", "Optional"),
+            ("HEC-RAS Bridge/Culvert/Structure Geometry (optional)", "hec_hydraulic_structures", "GPString", "Optional"),
+            ("Engineer Terrain Approval Notes (required for HEC-RAS-ready package)", "hec_terrain_approval", "GPString", "Optional"),
+            ("Manning's n / Roughness Notes (required for HEC-RAS-ready package)", "hec_mannings_n", "GPString", "Optional"),
+            ("Flow/Hydrology Boundary Conditions (required for HEC-RAS-ready package)", "hec_flow_boundary_conditions", "GPString", "Optional"),
+            ("Downstream Boundary Condition or Normal Slope (required for HEC-RAS-ready package)", "hec_downstream_boundary_condition", "GPString", "Optional"),
+            ("Geometry Review Notes (required for HEC-RAS-ready package)", "hec_geometry_review_notes", "GPString", "Optional"),
+            ("HEC-RAS Plan/Geometry File Notes (required for HEC-RAS-ready package)", "hec_model_plan_geometry", "GPString", "Optional"),
+            ("Calibration/Reasonableness Notes (required for HEC-RAS-ready package)", "hec_calibration_reasonableness", "GPString", "Optional"),
+            ("Engineer/Reviewer Name (required for HEC-RAS-ready package)", "hec_reviewer_name", "GPString", "Optional"),
         ]
         parameters = [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
         parameters[2].filter.list = ["kml", "kmz"]
@@ -139,6 +152,8 @@ class RunCompleteSiteWorkflow:
         parameters[12].value = True
         parameters[13].value = str(REPOSITORY_ROOT / "config" / "authoritative_sources.yaml")
         parameters[14].value = True
+        parameters[15].filter.list = ["Preliminary Review Package", "HEC-RAS-Ready Input Package"]
+        parameters[15].value = "Preliminary Review Package"
         return parameters
     def isLicensed(self): return arcpy.CheckExtension("Spatial") in {"Available", "CheckedOut"}
     def updateParameters(self, parameters):
@@ -169,6 +184,10 @@ class RunCompleteSiteWorkflow:
                 if not parameters[index].valueAsText and auto_sources.get(role):
                     parameters[index].value = auto_sources[role]
         parameters[13].enabled = not use_map
+        raster_names, feature_names = _current_map_layer_names()
+        if feature_names:
+            for index in (16, 17, 18, 19):
+                parameters[index].filter.list = feature_names
     def updateMessages(self, parameters):
         source_text = parameters[2].valueAsText
         if source_text and Path(source_text).is_file():
@@ -184,6 +203,22 @@ class RunCompleteSiteWorkflow:
                 parameters[7].setErrorMessage("Select the approved DEM layer from the current map, or add one layer named like DEM/3DEP/Elevation.")
             if not parameters[8].valueAsText and not auto_sources.get("USGS_TNM_Roads"):
                 parameters[8].setErrorMessage("Select the approved road layer from the current map, or add one layer named like Roads/Streets.")
+        if parameters[15].valueAsText == "HEC-RAS-Ready Input Package":
+            required = {
+                16: "Supply/select bank lines before requesting a HEC-RAS-ready package.",
+                18: "Supply/select cross sections before requesting a HEC-RAS-ready package.",
+                20: "Enter terrain approval notes before requesting a HEC-RAS-ready package.",
+                21: "Enter Manning's n / roughness notes before requesting a HEC-RAS-ready package.",
+                22: "Enter flow/hydrology boundary conditions before requesting a HEC-RAS-ready package.",
+                23: "Enter downstream boundary condition or normal slope before requesting a HEC-RAS-ready package.",
+                24: "Enter geometry review notes before requesting a HEC-RAS-ready package.",
+                25: "Enter HEC-RAS plan/geometry notes before requesting a HEC-RAS-ready package.",
+                26: "Enter calibration/reasonableness notes before requesting a HEC-RAS-ready package.",
+                27: "Enter the engineer/reviewer name before requesting a HEC-RAS-ready package.",
+            }
+            for index, message in required.items():
+                if not parameters[index].valueAsText:
+                    parameters[index].setErrorMessage(message)
     def execute(self, parameters, messages):
         run_complete_workflow = _load_complete_workflow_runner()
         use_map = parameters[6].valueAsText == "Existing Map Layers"
@@ -207,6 +242,17 @@ class RunCompleteSiteWorkflow:
                 map_sources["NLCD_Land_Cover"] = land_cover_layer
             if soils_layer:
                 map_sources["SSURGO_Hydrologic_Group"] = soils_layer
+        hec_model_inputs = {
+            "output_goal": parameters[15].valueAsText,
+            "approved_terrain": parameters[20].valueAsText,
+            "roughness_values": parameters[21].valueAsText,
+            "flow_boundary_conditions": parameters[22].valueAsText,
+            "downstream_boundary_condition": parameters[23].valueAsText,
+            "geometry_review_notes": parameters[24].valueAsText,
+            "model_plan_geometry": parameters[25].valueAsText,
+            "calibration_or_reasonableness": parameters[26].valueAsText,
+            "reviewer_name": parameters[27].valueAsText,
+        }
         result = run_complete_workflow(
             parameters[0].valueAsText, Path(parameters[1].valueAsText), parameters[2].valueAsText,
             parameters[4].value, sources, "USGS_3DEP_DEM", "USGS_TNM_Roads",
@@ -216,6 +262,11 @@ class RunCompleteSiteWorkflow:
             unit_system=parameters[5].valueAsText,
             soil_group_source_name="SSURGO_Hydrologic_Group",
             existing_map_sources=map_sources,
+            hec_model_inputs=hec_model_inputs,
+            hec_bank_lines=parameters[16].valueAsText or None,
+            hec_flow_paths=parameters[17].valueAsText or None,
+            hec_cross_sections=parameters[18].valueAsText or None,
+            hec_hydraulic_structures=parameters[19].valueAsText or None,
         )
         arcpy.AddMessage(f"Complete workflow outputs: {result.project_root}")
         if bool(parameters[14].value):
@@ -279,6 +330,14 @@ class PrepareHecRasPackage:
             ("Cross Section Candidates", "cross_sections", "GPFeatureLayer", "Optional"),
             ("Road and Crossing Locations", "crossings", "GPFeatureLayer", "Optional"),
             ("Land Cover / Roughness Source", "land_cover", "GPFeatureLayer", "Optional"),
+            ("Engineer Terrain Approval Notes", "hec_terrain_approval", "GPString", "Optional"),
+            ("Manning's n / Roughness Notes", "hec_mannings_n", "GPString", "Optional"),
+            ("Flow/Hydrology Boundary Conditions", "hec_flow_boundary_conditions", "GPString", "Optional"),
+            ("Downstream Boundary Condition or Normal Slope", "hec_downstream_boundary_condition", "GPString", "Optional"),
+            ("Geometry Review Notes", "hec_geometry_review_notes", "GPString", "Optional"),
+            ("HEC-RAS Plan/Geometry File Notes", "hec_model_plan_geometry", "GPString", "Optional"),
+            ("Calibration/Reasonableness Notes", "hec_calibration_reasonableness", "GPString", "Optional"),
+            ("Engineer/Reviewer Name", "hec_reviewer_name", "GPString", "Optional"),
         ]
         return [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
     def isLicensed(self): return arcpy.ProductInfo() not in {"NotInitialized", "Unavailable"}
@@ -287,7 +346,19 @@ class PrepareHecRasPackage:
     def execute(self, parameters, messages):
         names = ["stream_centerlines", "bank_lines", "flow_paths", "cross_sections", "crossings", "land_cover"]
         layers = {name: parameters[index + 2].valueAsText or None for index, name in enumerate(names)}
-        result = build_hec_ras_review_package(Path(parameters[0].valueAsText), parameters[1].valueAsText, arcpy, layers)
+        engineer_inputs = {
+            "approved_terrain": parameters[8].valueAsText,
+            "roughness_values": parameters[9].valueAsText,
+            "flow_boundary_conditions": parameters[10].valueAsText,
+            "downstream_boundary_condition": parameters[11].valueAsText,
+            "geometry_review_notes": parameters[12].valueAsText,
+            "model_plan_geometry": parameters[13].valueAsText,
+            "calibration_or_reasonableness": parameters[14].valueAsText,
+            "reviewer_name": parameters[15].valueAsText,
+        }
+        result = build_hec_ras_review_package(
+            Path(parameters[0].valueAsText), parameters[1].valueAsText, arcpy, layers, engineer_inputs=engineer_inputs
+        )
         arcpy.AddMessage(f"Review package: {result.package_root}"); arcpy.AddWarning(result.review_notes)
 
 

@@ -13,6 +13,10 @@ class _Parameter:
         self.__dict__.update(kwargs)
         self.value = None
         self.filter = types.SimpleNamespace(list=[])
+        self.errorMessage = None
+
+    def setErrorMessage(self, message):
+        self.errorMessage = message
 
     @property
     def valueAsText(self):
@@ -187,7 +191,11 @@ class ArcGISToolboxTests(unittest.TestCase):
             "project_name", "projects_root", "boundary", "boundary_polygon_name",
             "target_crs", "unit_system", "data_source_mode", "map_dem", "map_roads",
             "map_land_cover", "map_soils", "stream_threshold_cells", "fill_dem",
-            "source_catalog", "add_to_map",
+            "source_catalog", "add_to_map", "hec_output_goal", "hec_bank_lines",
+            "hec_flow_paths", "hec_cross_sections", "hec_hydraulic_structures",
+            "hec_terrain_approval", "hec_mannings_n", "hec_flow_boundary_conditions",
+            "hec_downstream_boundary_condition", "hec_geometry_review_notes",
+            "hec_model_plan_geometry", "hec_calibration_reasonableness", "hec_reviewer_name",
         ])
         self.assertEqual(parameters[2].filter.list, ["kml", "kmz"])
         self.assertEqual(parameters[5].filter.list, ["Imperial", "Metric"])
@@ -196,6 +204,26 @@ class ArcGISToolboxTests(unittest.TestCase):
         self.assertEqual(parameters[8].datatype, "GPString")
         self.assertEqual(parameters[9].datatype, "GPString")
         self.assertEqual(parameters[10].datatype, "GPString")
+        self.assertEqual(parameters[15].filter.list, ["Preliminary Review Package", "HEC-RAS-Ready Input Package"])
+
+    def test_hec_ready_goal_prompts_for_engineer_inputs_before_run(self):
+        fake_arcpy = types.SimpleNamespace(Parameter=_Parameter)
+        toolbox_path = Path(__file__).parents[1] / "toolboxes" / "site_hydrology_workflow.pyt"
+        loader = importlib.machinery.SourceFileLoader("site_hydrology_toolbox_hec_prompts_test", str(toolbox_path))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {"arcpy": fake_arcpy}):
+            loader.exec_module(module)
+
+        tool = module.RunCompleteSiteWorkflow()
+        parameters = tool.getParameterInfo()
+        parameters[6].value = "Authoritative Catalog"
+        parameters[15].value = "HEC-RAS-Ready Input Package"
+        tool.updateMessages(parameters)
+
+        self.assertIn("bank lines", parameters[16].errorMessage)
+        self.assertIn("Manning", parameters[21].errorMessage)
+        self.assertIn("reviewer name", parameters[27].errorMessage)
 
     def test_existing_map_mode_auto_detects_current_map_layers_by_name(self):
         class _Map:

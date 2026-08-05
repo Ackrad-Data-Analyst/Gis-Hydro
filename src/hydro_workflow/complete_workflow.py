@@ -59,6 +59,11 @@ def run_complete_workflow(
     unit_system: str = "Imperial",
     soil_group_source_name: str | None = None,
     existing_map_sources: dict[str, str] | None = None,
+    hec_model_inputs: dict[str, str | None] | None = None,
+    hec_bank_lines: str | None = None,
+    hec_flow_paths: str | None = None,
+    hec_cross_sections: str | None = None,
+    hec_hydraulic_structures: str | None = None,
 ) -> CompleteWorkflowResult:
     """Run all implemented operations and stop at the first unsafe condition."""
     units = unit_preferences(unit_system)
@@ -184,12 +189,14 @@ def run_complete_workflow(
         root, terrain.filled_dem or by_name[dem_source_name], arcpy_adapter,
         {
             "stream_centerlines": terrain.drainage_paths,
-            "bank_lines": None,
-            "flow_paths": terrain.drainage_paths,
-            "cross_sections": None,
+            "bank_lines": hec_bank_lines,
+            "flow_paths": hec_flow_paths or terrain.drainage_paths,
+            "cross_sections": hec_cross_sections,
             "crossings": crossings_output,
+            "hydraulic_structures": hec_hydraulic_structures,
             "land_cover": response_units or (by_name.get(land_cover_source_name) if land_cover_source_name else None),
         },
+        engineer_inputs=hec_model_inputs,
     )
     qa_json, _ = generate_qa_package(root)
     optional_failures = sorted({item.source_name for item in acquisition_failures} | set(failed_standard))

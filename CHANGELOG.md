@@ -28,6 +28,14 @@
   `NOT_RUNNABLE_HEC_RAS_MODEL` until required engineering inputs such as bank lines, cross
   sections, flow paths, structures, Manning values, flow/boundary conditions, and reviewer
   signoff are supplied.
+- Added HEC-RAS-ready input-package prompts to the automated ArcGIS tool so missing bank
+  lines, cross sections, terrain approval, Manning's n/roughness, flow/boundary conditions,
+  geometry review notes, model-plan notes, calibration/reasonableness notes, and reviewer
+  name are requested in the dialog before execution instead of failing downstream or being
+  invented.
+- Reviewed the team-provided USGS 3DEP bulk-download toolbox pattern and documented where
+  its TNMAccess paging/retry/tile-mosaic approach should be adopted for production DEM
+  acquisition when existing map DEM layers are not sufficient.
 
 ## 0.3.4 - 2026-08-04
 
