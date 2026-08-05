@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .workflow_preferences import load_engineering_lookup
+
 
 @dataclass(frozen=True)
 class HecRasPackageResult:
@@ -68,7 +70,12 @@ def _missing_model_inputs(
     for name in required_names:
         if name in layer_requirements and name not in copied_layers:
             missing.append(name)
-        elif name in input_requirements and name not in engineer_inputs:
+        elif name == "roughness_values" and not (
+            "roughness_values" in engineer_inputs
+            or engineer_inputs.get("engineering_lookup_status") == "APPROVED"
+        ):
+            missing.append(name)
+        elif name in input_requirements and name != "roughness_values" and name not in engineer_inputs:
             missing.append(name)
         elif (
             name == "hydraulic_structures"
@@ -204,6 +211,17 @@ def build_hec_ras_review_package(
     for report in sorted((root / "qa_qc").glob("*.json")):
         qa_files[report.name] = _hash(report)
     clean_engineer_inputs = _clean_inputs(engineer_inputs)
+    lookup_path = clean_engineer_inputs.get("engineering_lookup")
+    if lookup_path:
+        try:
+            lookup = load_engineering_lookup(Path(lookup_path))
+            clean_engineer_inputs["engineering_lookup_status"] = "APPROVED"
+            clean_engineer_inputs["engineering_lookup_approved_by"] = str(lookup.get("approved_by", ""))
+            clean_engineer_inputs["engineering_lookup_approved_date"] = str(lookup.get("approved_date", ""))
+            clean_engineer_inputs["roughness_values"] = "Approved Manning's n lookup supplied in engineering_lookup."
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+            clean_engineer_inputs["engineering_lookup_status"] = "REVIEW_REQUIRED"
+            clean_engineer_inputs["engineering_lookup_error"] = " ".join(str(error).split())[:300]
     engineer_inputs_path = package / "qa_qc" / "hec_ras_engineer_inputs.json"
     engineer_inputs_path.write_text(
         json.dumps(clean_engineer_inputs, indent=2, sort_keys=True) + "\n", encoding="utf-8"

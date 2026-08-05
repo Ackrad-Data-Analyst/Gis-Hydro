@@ -2,6 +2,16 @@
 
 ## 0.3.5
 
+- Added a Jeremy-facing workflow progress document that maps the prototype to Adolfo's
+  seven-step Automated Hydro Workflow flowchart.
+- Renamed the one-dialog data source choice from authoritative-only wording to
+  **Catalog Services** beside **Existing Map Layers** so the interface communicates that
+  map layers, project data, catalog services, and reference-only sources can all support
+  the workflow.
+- Added NOAA Atlas 14 PFDS as a reference-only rainfall/storm source. Reference-only
+  catalog rows write REVIEW records and do not fail acquisition just because a rainfall
+  value must be selected later by the engineer.
+
 - Replaced the misleading toolbox-not-found message with direct **Extract All** instructions
   when Windows launches the command file from inside a ZIP preview.
 - Added a regression check and operator guidance for distinguishing a compressed ZIP view
@@ -24,15 +34,17 @@
 - Made hydrologic response-unit combination fail safely as a REVIEW REQUIRED note when
   optional land-cover/soil rasters cannot be combined, and made repeated HEC review-package
   exports create a new suffixed output folder instead of overwriting or stopping a rerun.
-- Added an explicit HEC-RAS readiness report and manifest fields that classify the package as
-  `NOT_RUNNABLE_HEC_RAS_MODEL` until required engineering inputs such as bank lines, cross
-  sections, flow paths, structures, Manning values, flow/boundary conditions, and reviewer
-  signoff are supplied.
-- Added HEC-RAS-ready input-package prompts to the automated ArcGIS tool so missing bank
-  lines, cross sections, structure geometry or no-structure confirmation, terrain approval,
-  Manning's n/roughness, flow/boundary conditions, geometry review notes, model-plan notes,
-  calibration/reasonableness notes, and reviewer name are requested in the dialog before
-  execution instead of failing downstream or being invented.
+- Simplified the automated ArcGIS dialog per manager feedback: removed bank-line,
+  cross-section, HEC-RAS boundary-condition, plan/geometry-note, calibration-note, and
+  reviewer-name prompts from the first-run workflow. Those items are deferred to HEC-RAS
+  or a later focused tool after the package has produced reviewed terrain, drainage, road,
+  structure, and source-layer outputs.
+- Replaced the freeform Manning's n / roughness prompt with an optional approved
+  engineering lookup JSON. An approved lookup can satisfy the roughness input in the
+  readiness report; otherwise roughness remains listed as missing instead of being invented.
+- Updated the source catalog to match the manager-provided service list, including ESRI
+  Transportation roads/railroads and USGS NHDPlus HR streams in addition to 3DEP, HUC12,
+  FEMA NFHL, NLCD, HSG, and soils map-unit services.
 - Reviewed the team-provided USGS 3DEP bulk-download toolbox pattern and documented where
   its TNMAccess paging/retry/tile-mosaic approach should be adopted for production DEM
   acquisition when existing map DEM layers are not sufficient.

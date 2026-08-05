@@ -1,4 +1,4 @@
-"""Site-agnostic authoritative-source catalog and acquisition planning."""
+"""Site-agnostic reviewed-source catalog and acquisition planning."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ REQUIRED_FIELDS = {
     "authentication", "operation", "filter", "resampling",
 }
 ALLOWED_AUTHENTICATION = {"none", "arcgis_org"}
-ALLOWED_OPERATIONS = {"extract", "spatial_query_clip", "select_intersecting_copy"}
+ALLOWED_OPERATIONS = {"extract", "spatial_query_clip", "select_intersecting_copy", "reference_only"}
 
 # Catalog rows are intentionally not restricted to a fixed list of agencies or dataset
 # names. A team can add any number of reviewed sources using the supported operations.
@@ -47,7 +47,7 @@ class AcquisitionPlanRecord:
 
 
 def load_source_catalog(path: Path) -> list[dict[str, str]]:
-    """Load and strictly validate an editable authoritative-source catalog."""
+    """Load and strictly validate an editable reviewed-source catalog."""
     config = load_json_yaml(path)
     sources = config.get("sources")
     if not isinstance(sources, list) or not sources:

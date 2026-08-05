@@ -50,12 +50,24 @@
       "resampling": "VECTOR"
     },
     {
-      "name": "USGS_TNM_Roads",
-      "category": "Road centerlines",
-      "source_agency": "USGS National Geospatial Program",
-      "source_type": "map_service_layer",
+      "name": "USGS_NHDPlus_HR",
+      "category": "Streams",
+      "source_agency": "USGS",
+      "source_type": "feature_service",
       "item_id": "",
-      "rest_url": "https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/0",
+      "rest_url": "https://services5.arcgis.com/7weheFjxuNkGGiZi/arcgis/rest/services/National_Hydrography_Dataset_Plus_High_Resolution/FeatureServer",
+      "authentication": "none",
+      "operation": "select_intersecting_copy",
+      "filter": "1=1",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "ESRI_Transportation_Roads_Railroads",
+      "category": "Roads and railroads",
+      "source_agency": "ESRI Federal Data",
+      "source_type": "feature_service",
+      "item_id": "",
+      "rest_url": "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Transportation_v1/FeatureServer",
       "authentication": "none",
       "operation": "select_intersecting_copy",
       "filter": "1=1",
@@ -96,6 +108,18 @@
       "operation": "extract",
       "filter": "",
       "resampling": "BILINEAR"
+    },
+    {
+      "name": "NOAA_Atlas_14_Precipitation",
+      "category": "Rainfall and storm temporal distribution",
+      "source_agency": "NOAA National Weather Service",
+      "source_type": "reference_web",
+      "item_id": "",
+      "rest_url": "https://hdsc.nws.noaa.gov/pfds/",
+      "authentication": "none",
+      "operation": "reference_only",
+      "filter": "Project centroid or reviewed location; engineer selects precipitation frequency/depth and temporal distribution.",
+      "resampling": "REFERENCE_ONLY"
     }
   ]
 }

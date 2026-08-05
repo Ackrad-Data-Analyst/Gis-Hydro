@@ -35,20 +35,26 @@ without adding dependencies:
 For a normal new site, run **00 - START HERE > Automated Site Workflow - KMZ to Review
 Package**. In one dialog, choose the project name, parent projects folder, KML/KMZ,
 boundary polygon name, approved CRS, Imperial/Metric units, reviewed stream threshold,
-fill choice, data mode, and HEC-RAS output goal. **Existing Map Layers** is the preferred manager-demo mode:
+fill choice, and data mode. **Existing Map Layers** is the preferred manager-demo mode:
 it snapshots the DEM/roads and optional land-cover/soil layers from the current ArcGIS
 map. If exactly one current-map layer name looks like DEM/3DEP/Elevation, Roads/Streets,
 NLCD/LandCover, or Soils/HSG, the toolbox fills that layer automatically; ambiguous
-matches stay blank for operator review. **Authoritative Catalog** remains available for
-controlled service testing but should not be the only path for a manager demonstration.
-The automated tool creates the project file geodatabase and all implemented downstream
-review outputs. If the operator selects **HEC-RAS-Ready Input Package**, ArcGIS prompts
-for bank lines, cross sections, structure geometry or a no-structure confirmation, approved
-terrain notes, Manning's n/roughness notes, flow and downstream boundary conditions,
-geometry review notes, HEC-RAS plan/geometry notes, calibration/reasonableness notes,
-and the engineer/reviewer name before the run
-continues. Blank required assumptions are shown in the ArcGIS dialog instead of being
-invented or failing later.
+matches stay blank for operator review. **Catalog Services** remains available for
+configured web-service/reference sources, but it is not the only path and reference-only
+sources such as NOAA Atlas 14 are recorded for engineer selection instead of failing the run.
+The automated tool creates the project file geodatabase and implemented downstream
+review outputs without asking for HEC-RAS bank lines, cross sections, boundary conditions,
+plan/geometry notes, calibration notes, or reviewer signoff in the first run. Those items
+are normally completed later in HEC-RAS or a focused follow-up tool after the terrain,
+drainage, roads, structures, and source layers have been reviewed.
+
+The main automated dialog keeps HEC-RAS preparation inputs short: optional flow-path
+layer, optional bridge/culvert/structure geometry, optional no-structure confirmation,
+and optional approved engineering lookup JSON. Manning's n, curve-number, and
+infiltration values are not typed as free text in the main workflow; when available, they
+come from an approved lookup file that records reviewer approval. If no approved lookup
+is supplied, the package reports roughness/CN/infiltration as missing instead of inventing
+engineering values.
 
 Existing map image services are selected by layer name and clipped to the project boundary
 before they are copied. If ArcGIS would exceed an image-service row/column limit such as
@@ -69,17 +75,18 @@ Do not rerun a completed stage over existing outputs.
 2. **01 - Create Project Workspace:** provide a project name and projects root.
 3. **01 - Import and Validate KML/KMZ Boundary:** select the source, workspace, and exact
    polygon candidate. Visually compare the imported polygon with the approved site exhibit.
-4. **02 - Download Authoritative Data:** leave Source Names blank to run the catalog. The
-   catalog includes federal DEM, roads, watershed, land-cover and flood sources plus USDA
-   soil sources. Completed immutable downloads are reused; failures receive separate retry
-   records.
+4. **02 - Download/Stage Catalog Data:** leave Source Names blank to run the catalog. The
+   catalog includes DEM, roads/railroads, HUC12, NHDPlus HR streams, FEMA flood zones,
+   NLCD land cover, hydrologic soil groups, soil map units, and NOAA Atlas 14 rainfall as
+   a reference-only source. Completed immutable downloads are reused; failures receive
+   separate retry records rather than replacing previous outputs.
 5. **03 - Validate, Standardize, and Clip:** select the engineer/GIS-approved project CRS.
 6. **04 - Prepare Terrain, Drainage, and Watershed Candidates:** select the standardized
    DEM and enter reviewed terrain parameters. A requested 1 m DEM must be confirmed from
    the acquisition and standardization reports; do not treat resampled coarse data as new
    1 m accuracy.
 7. **05 - Screen Roads, Bridges, Culverts, and Drainage Crossings:** use standardized
-   `USGS_TNM_Roads`, or replace it with a more authoritative state/local DOT layer when
+   `ESRI_Transportation_Roads_Railroads`, or replace it with a more authoritative state/local DOT layer when
    available. Bridge/culvert inputs and search distance are optional and REVIEW REQUIRED.
 8. **06 - Prepare Preliminary HEC-RAS Review Package:** export terrain and available vector
    candidates. Missing banks, cross sections, structures, rainfall, infiltration, or

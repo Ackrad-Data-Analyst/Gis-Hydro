@@ -15,20 +15,22 @@ CONFIG = Path(__file__).parents[1] / "config"
 class SourceCatalogTests(unittest.TestCase):
     def test_manager_catalog_loads(self):
         sources = load_source_catalog(CONFIG / "authoritative_sources.yaml")
-        self.assertEqual(len(sources), 8)
-        roads = next(source for source in sources if source["name"] == "USGS_TNM_Roads")
-        self.assertEqual(roads["category"], "Road centerlines")
-        self.assertTrue(roads["rest_url"].endswith("/MapServer/0"))
+        self.assertEqual(len(sources), 10)
+        roads = next(source for source in sources if source["name"] == "ESRI_Transportation_Roads_Railroads")
+        self.assertEqual(roads["category"], "Roads and railroads")
+        self.assertTrue(roads["rest_url"].endswith("/Transportation_v1/FeatureServer"))
+        rainfall = next(source for source in sources if source["name"] == "NOAA_Atlas_14_Precipitation")
+        self.assertEqual(rainfall["operation"], "reference_only")
         self.assertEqual(
             {source["source_agency"] for source in sources},
-            {"USGS", "USGS National Geospatial Program", "FEMA", "USDA NRCS"},
+            {"USGS", "ESRI Federal Data", "FEMA", "USDA NRCS", "NOAA National Weather Service"},
         )
 
     def test_plan_is_site_agnostic_and_review_required(self):
         with tempfile.TemporaryDirectory() as folder:
             boundary = make_kmz(Path(folder) / "any_site_boundary.kmz")
             records = build_acquisition_plan("Any Site 101", boundary, load_source_catalog(CONFIG / "authoritative_sources.yaml"))
-            self.assertEqual(len(records), 8)
+            self.assertEqual(len(records), 10)
             self.assertTrue(all(record.project_name == "Any Site 101" for record in records))
             self.assertTrue(all(record.plan_status == "REVIEW" for record in records))
             self.assertIsNotNone(records[0].boundary_west)
@@ -43,13 +45,13 @@ class SourceCatalogTests(unittest.TestCase):
                 boundary=boundary, project_name="Generic Site", config=CONFIG,
                 output_folder=output, dry_run=False,
             ))
-            self.assertEqual(summary["source_count"], 8)
+            self.assertEqual(summary["source_count"], 10)
             self.assertTrue((output / "data_acquisition_plan.csv").is_file())
             self.assertTrue((output / "data_acquisition_plan.json").is_file())
             with (output / "data_acquisition_plan.csv").open(newline="", encoding="utf-8") as stream:
                 self.assertIn("rest_url", csv.DictReader(stream).fieldnames)
             payload = json.loads((output / "data_acquisition_plan.json").read_text())
-            self.assertEqual(len(payload["sources"]), 8)
+            self.assertEqual(len(payload["sources"]), 10)
             self.assertFalse(any(output.rglob("*.tif")))
 
     def test_dry_run_writes_nothing(self):
@@ -72,5 +74,5 @@ class SourceCatalogTests(unittest.TestCase):
                 boundary=boundary, project_name="Generic Site", config=CONFIG,
                 output_folder=output, dry_run=False,
             ))
-            self.assertEqual(summary["source_count"], 8)
+            self.assertEqual(summary["source_count"], 10)
             self.assertTrue((output / "data_acquisition_plan.json").is_file())

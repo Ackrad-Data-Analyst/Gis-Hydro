@@ -116,6 +116,18 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             self.assertTrue(all(result.status == "REVIEW" for result in results))
             self.assertTrue(all(result.sha256 for result in results))
 
+
+    def test_reference_only_source_records_review_without_arcgis_download(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            results = acquire_catalog_sources(root, [_source("NOAA_Atlas_14_Precipitation", "reference_only")], _ArcPy())
+            self.assertEqual(len(results), 1)
+            self.assertEqual(results[0].status, "REVIEW")
+            self.assertEqual(results[0].coverage, "REFERENCE_ONLY")
+            self.assertIsNone(results[0].working_output)
+            self.assertIn("Engineer must select", results[0].message)
+            self.assertTrue(Path(results[0].original_output).is_file())
+
     def test_vector_and_raster_outputs_are_hashed_and_manifested(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "site"; _project(root)
@@ -171,7 +183,7 @@ class AuthoritativeAcquisitionTests(unittest.TestCase):
             root = Path(temp) / "site"; _project(root)
             adapter = _ArcPy()
             results = stage_existing_map_sources(
-                root, {"USGS_3DEP_DEM": "approved_dem", "USGS_TNM_Roads": "approved_roads"}, adapter
+                root, {"USGS_3DEP_DEM": "approved_dem", "ESRI_Transportation_Roads_Railroads": "approved_roads"}, adapter
             )
             self.assertEqual(len(results), 2)
             self.assertTrue(all(item.operation == "snapshot_from_map" for item in results))

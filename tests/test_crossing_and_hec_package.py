@@ -89,34 +89,37 @@ class CrossingAndHecTests(unittest.TestCase):
             readiness = json.loads(Path(result.readiness_report).read_text(encoding="utf-8"))
             self.assertIn("land_cover", readiness["available_review_inputs"])
 
-    def test_hec_package_records_engineer_inputs_when_supplied(self):
+    def test_hec_package_uses_approved_lookup_for_roughness_without_freeform_notes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "site"; _project(root)
+            lookup = root / "approved_lookup.json"
+            lookup.write_text(json.dumps({
+                "approval_status": "APPROVED",
+                "approved_by": "Synthetic Reviewer",
+                "approved_date": "2026-08-05",
+                "technical_basis": "Synthetic fixture only",
+                "curve_numbers": {"open_space_good": 61},
+                "mannings_n": {"natural_channel": 0.035},
+                "infiltration_rates": {"soil_group_a": 0.3},
+            }), encoding="utf-8")
+
             result = build_hec_ras_review_package(
                 root, "terrain", _ArcPy(),
                 {
                     "stream_centerlines": "streams",
-                    "bank_lines": "streams",
                     "flow_paths": "streams",
-                    "cross_sections": "streams",
                     "crossings": "drainage",
                 },
                 engineer_inputs={
                     "hydraulic_structures_review": "Engineer confirmed no structures affect the synthetic reach.",
-                    "approved_terrain": "Engineer reviewed DEM, datum, and units.",
-                    "roughness_values": "Channel n=engineer supplied; overbank n=engineer supplied.",
-                    "flow_boundary_conditions": "Engineer supplied flow file basis.",
-                    "downstream_boundary_condition": "Engineer supplied normal slope.",
-                    "geometry_review_notes": "Engineer reviewed banks, XS, and stationing.",
-                    "model_plan_geometry": "Engineer will build/import HEC-RAS geometry from exported inputs.",
-                    "calibration_or_reasonableness": "Engineer reasonableness review required before use.",
-                    "reviewer_name": "Synthetic Engineer",
+                    "engineering_lookup": str(lookup),
                 },
             )
             readiness = json.loads(Path(result.readiness_report).read_text(encoding="utf-8"))
-            self.assertEqual(readiness["ras_readiness"], "HEC_RAS_MODEL_INPUT_PACKAGE_READY_FOR_ENGINEER_REVIEW")
-            self.assertEqual(readiness["missing_required_model_inputs"], [])
+            self.assertEqual(readiness["engineer_supplied_model_inputs"]["engineering_lookup_status"], "APPROVED")
             self.assertIn("roughness_values", readiness["engineer_supplied_model_inputs"])
+            self.assertNotIn("roughness_values", readiness["missing_required_model_inputs"])
+            self.assertIn("cross_sections", readiness["missing_required_model_inputs"])
 
     def test_hec_review_package_uses_new_folder_when_previous_package_exists(self):
         with tempfile.TemporaryDirectory() as temp:

@@ -167,6 +167,8 @@ def _existing_success(source_folder: Path, arcpy_adapter: Any) -> AcquisitionRes
         result = AcquisitionResult(**payload)
     except (OSError, ValueError, TypeError):
         return None
+    if result.status == "REVIEW" and result.operation == "reference_only":
+        return result
     if (
         result.status == "REVIEW"
         and result.original_output
@@ -255,6 +257,41 @@ def acquire_catalog_sources(
                 if arcpy_adapter.Exists(working_output):
                     raise FileExistsError(f"Working raster exists: {working_output}")
                 arcpy_adapter.management.CopyRaster(str(original_output), working_output)
+            elif source["operation"] == "reference_only":
+                original_output = source_folder / f"{safe_name}_reference.json"
+                original_output.write_text(
+                    json.dumps({
+                        "source_name": source["name"],
+                        "category": source["category"],
+                        "source_agency": source["source_agency"],
+                        "reference_url": source["rest_url"],
+                        "review_required": True,
+                        "message": (
+                            "Reference-only source. The tool records the source and boundary context, "
+                            "but an engineer must use the referenced application or later tool to select values."
+                        ),
+                    }, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
+                result = AcquisitionResult(
+                    source_name=source["name"], category=source["category"],
+                    agency=source["source_agency"], service_url=source["rest_url"],
+                    operation=source["operation"], requested_at=requested_at,
+                    completed_at=datetime.now(timezone.utc).isoformat(), query_parameters=query,
+                    original_output=str(original_output), working_output=None,
+                    sha256=_sha256(original_output), coordinate_system=None,
+                    resolution_or_scale=None, coverage="REFERENCE_ONLY", status="REVIEW",
+                    message=(
+                        "Reference-only rainfall/storm source recorded without failing acquisition. "
+                        "Engineer must select project-approved precipitation depths, durations, "
+                        "temporal distribution, and HEC-RAS precipitation inputs in the later rainfall step."
+                    ),
+                )
+                (source_folder / "acquisition_record.json").write_text(
+                    json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+                )
+                results.append(result)
+                continue
             else:
                 raise ValueError(f"Unsupported configured operation: {source['operation']}")
 

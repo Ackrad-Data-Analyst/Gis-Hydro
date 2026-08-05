@@ -82,7 +82,7 @@ def _auto_detect_map_sources():
     raster_names, feature_names = _current_map_layer_names()
     return {
         "USGS_3DEP_DEM": _choose_unique_layer(raster_names, ("3dep", "dem", "elevation")),
-        "USGS_TNM_Roads": _choose_unique_layer(feature_names, ("road", "roads", "street")),
+        "ESRI_Transportation_Roads_Railroads": _choose_unique_layer(feature_names, ("road", "roads", "street")),
         "NLCD_Land_Cover": _choose_unique_layer(raster_names, ("nlcd", "land cover", "landcover")),
         "SSURGO_Hydrologic_Group": _choose_unique_layer(raster_names, ("soil", "ssurgo", "hydrologic group", "hsg")),
     }
@@ -127,34 +127,23 @@ class RunCompleteSiteWorkflow:
             ("Existing Map Hydrologic Soil Groups (optional)", "map_soils", "GPString", "Optional"),
             ("Stream Threshold (Contributing Cells; REVIEW REQUIRED)", "stream_threshold_cells", "GPLong", "Required"),
             ("Fill Depressions (REVIEW REQUIRED)", "fill_dem", "GPBoolean", "Required"),
-            ("Authoritative Source Catalog", "source_catalog", "DEFile", "Required"),
+            ("Source Catalog (used only for Catalog Services mode)", "source_catalog", "DEFile", "Required"),
             ("Add Elevation and Boundary Outline to Current Map", "add_to_map", "GPBoolean", "Required"),
-            ("HEC-RAS Output Goal", "hec_output_goal", "GPString", "Required"),
-            ("HEC-RAS Bank Lines (required for HEC-RAS-ready package)", "hec_bank_lines", "GPString", "Optional"),
             ("HEC-RAS Flow Paths (optional; drainage paths used if blank)", "hec_flow_paths", "GPString", "Optional"),
-            ("HEC-RAS Cross Sections (required for HEC-RAS-ready package)", "hec_cross_sections", "GPString", "Optional"),
             ("HEC-RAS Bridge/Culvert/Structure Geometry (optional)", "hec_hydraulic_structures", "GPString", "Optional"),
-            ("Structure Review / No-Structure Confirmation (required for HEC-RAS-ready package)", "hec_hydraulic_structures_review", "GPString", "Optional"),
-            ("Engineer Terrain Approval Notes (required for HEC-RAS-ready package)", "hec_terrain_approval", "GPString", "Optional"),
-            ("Manning's n / Roughness Notes (required for HEC-RAS-ready package)", "hec_mannings_n", "GPString", "Optional"),
-            ("Flow/Hydrology Boundary Conditions (required for HEC-RAS-ready package)", "hec_flow_boundary_conditions", "GPString", "Optional"),
-            ("Downstream Boundary Condition or Normal Slope (required for HEC-RAS-ready package)", "hec_downstream_boundary_condition", "GPString", "Optional"),
-            ("Geometry Review Notes (required for HEC-RAS-ready package)", "hec_geometry_review_notes", "GPString", "Optional"),
-            ("HEC-RAS Plan/Geometry File Notes (required for HEC-RAS-ready package)", "hec_model_plan_geometry", "GPString", "Optional"),
-            ("Calibration/Reasonableness Notes (required for HEC-RAS-ready package)", "hec_calibration_reasonableness", "GPString", "Optional"),
-            ("Engineer/Reviewer Name (required for HEC-RAS-ready package)", "hec_reviewer_name", "GPString", "Optional"),
+            ("Structure Review / No-Structure Confirmation (optional)", "hec_hydraulic_structures_review", "GPString", "Optional"),
+            ("Approved Engineering Lookup JSON (optional; Manning's n/CN/infiltration)", "engineering_lookup", "DEFile", "Optional"),
         ]
         parameters = [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
         parameters[2].filter.list = ["kml", "kmz"]
         parameters[5].filter.list = ["Imperial", "Metric"]
         parameters[5].value = "Imperial"
-        parameters[6].filter.list = ["Authoritative Catalog", "Existing Map Layers"]
+        parameters[6].filter.list = ["Existing Map Layers", "Catalog Services"]
         parameters[6].value = "Existing Map Layers"
         parameters[12].value = True
         parameters[13].value = str(REPOSITORY_ROOT / "config" / "authoritative_sources.yaml")
         parameters[14].value = True
-        parameters[15].filter.list = ["Preliminary Review Package", "HEC-RAS-Ready Input Package"]
-        parameters[15].value = "Preliminary Review Package"
+        parameters[18].filter.list = ["json"]
         return parameters
     def isLicensed(self): return arcpy.CheckExtension("Spatial") in {"Available", "CheckedOut"}
     def updateParameters(self, parameters):
@@ -180,14 +169,14 @@ class RunCompleteSiteWorkflow:
                     parameters[index].filter.list = raster_names
             if feature_names:
                 parameters[8].filter.list = feature_names
-            auto_defaults = {7: "USGS_3DEP_DEM", 8: "USGS_TNM_Roads", 9: "NLCD_Land_Cover", 10: "SSURGO_Hydrologic_Group"}
+            auto_defaults = {7: "USGS_3DEP_DEM", 8: "ESRI_Transportation_Roads_Railroads", 9: "NLCD_Land_Cover", 10: "SSURGO_Hydrologic_Group"}
             for index, role in auto_defaults.items():
                 if not parameters[index].valueAsText and auto_sources.get(role):
                     parameters[index].value = auto_sources[role]
         parameters[13].enabled = not use_map
         raster_names, feature_names = _current_map_layer_names()
         if feature_names:
-            for index in (16, 17, 18, 19):
+            for index in (15, 16):
                 parameters[index].filter.list = feature_names
     def updateMessages(self, parameters):
         source_text = parameters[2].valueAsText
@@ -202,25 +191,8 @@ class RunCompleteSiteWorkflow:
             auto_sources = _auto_detect_map_sources()
             if not parameters[7].valueAsText and not auto_sources.get("USGS_3DEP_DEM"):
                 parameters[7].setErrorMessage("Select the approved DEM layer from the current map, or add one layer named like DEM/3DEP/Elevation.")
-            if not parameters[8].valueAsText and not auto_sources.get("USGS_TNM_Roads"):
+            if not parameters[8].valueAsText and not auto_sources.get("ESRI_Transportation_Roads_Railroads"):
                 parameters[8].setErrorMessage("Select the approved road layer from the current map, or add one layer named like Roads/Streets.")
-        if parameters[15].valueAsText == "HEC-RAS-Ready Input Package":
-            required = {
-                16: "Supply/select bank lines before requesting a HEC-RAS-ready package.",
-                18: "Supply/select cross sections before requesting a HEC-RAS-ready package.",
-                20: "Enter structure review notes, or confirm no structures affect the reach.",
-                21: "Enter terrain approval notes before requesting a HEC-RAS-ready package.",
-                22: "Enter Manning's n / roughness notes before requesting a HEC-RAS-ready package.",
-                23: "Enter flow/hydrology boundary conditions before requesting a HEC-RAS-ready package.",
-                24: "Enter downstream boundary condition or normal slope before requesting a HEC-RAS-ready package.",
-                25: "Enter geometry review notes before requesting a HEC-RAS-ready package.",
-                26: "Enter HEC-RAS plan/geometry notes before requesting a HEC-RAS-ready package.",
-                27: "Enter calibration/reasonableness notes before requesting a HEC-RAS-ready package.",
-                28: "Enter the engineer/reviewer name before requesting a HEC-RAS-ready package.",
-            }
-            for index, message in required.items():
-                if not parameters[index].valueAsText:
-                    parameters[index].setErrorMessage(message)
     def execute(self, parameters, messages):
         run_complete_workflow = _load_complete_workflow_runner()
         use_map = parameters[6].valueAsText == "Existing Map Layers"
@@ -229,14 +201,14 @@ class RunCompleteSiteWorkflow:
         if use_map:
             auto_sources = _auto_detect_map_sources()
             dem_layer = parameters[7].valueAsText or auto_sources.get("USGS_3DEP_DEM")
-            roads_layer = parameters[8].valueAsText or auto_sources.get("USGS_TNM_Roads")
+            roads_layer = parameters[8].valueAsText or auto_sources.get("ESRI_Transportation_Roads_Railroads")
             if not dem_layer:
                 raise ValueError("Existing Map Layers mode needs an approved DEM layer in the current map. Add/select a layer named like DEM, 3DEP, or Elevation.")
             if not roads_layer:
                 raise ValueError("Existing Map Layers mode needs an approved roads layer in the current map. Add/select a layer named like Roads or Streets.")
             map_sources = {
                 "USGS_3DEP_DEM": dem_layer,
-                "USGS_TNM_Roads": roads_layer,
+                "ESRI_Transportation_Roads_Railroads": roads_layer,
             }
             land_cover_layer = parameters[9].valueAsText or auto_sources.get("NLCD_Land_Cover")
             soils_layer = parameters[10].valueAsText or auto_sources.get("SSURGO_Hydrologic_Group")
@@ -245,20 +217,12 @@ class RunCompleteSiteWorkflow:
             if soils_layer:
                 map_sources["SSURGO_Hydrologic_Group"] = soils_layer
         hec_model_inputs = {
-            "output_goal": parameters[15].valueAsText,
-            "hydraulic_structures_review": parameters[20].valueAsText,
-            "approved_terrain": parameters[21].valueAsText,
-            "roughness_values": parameters[22].valueAsText,
-            "flow_boundary_conditions": parameters[23].valueAsText,
-            "downstream_boundary_condition": parameters[24].valueAsText,
-            "geometry_review_notes": parameters[25].valueAsText,
-            "model_plan_geometry": parameters[26].valueAsText,
-            "calibration_or_reasonableness": parameters[27].valueAsText,
-            "reviewer_name": parameters[28].valueAsText,
+            "hydraulic_structures_review": parameters[17].valueAsText,
+            "engineering_lookup": parameters[18].valueAsText,
         }
         result = run_complete_workflow(
             parameters[0].valueAsText, Path(parameters[1].valueAsText), parameters[2].valueAsText,
-            parameters[4].value, sources, "USGS_3DEP_DEM", "USGS_TNM_Roads",
+            parameters[4].value, sources, "USGS_3DEP_DEM", "ESRI_Transportation_Roads_Railroads",
             int(parameters[11].value), bool(parameters[12].value), arcpy,
             land_cover_source_name="NLCD_Land_Cover",
             boundary_polygon_name=parameters[3].valueAsText or None,
@@ -266,10 +230,8 @@ class RunCompleteSiteWorkflow:
             soil_group_source_name="SSURGO_Hydrologic_Group",
             existing_map_sources=map_sources,
             hec_model_inputs=hec_model_inputs,
-            hec_bank_lines=parameters[16].valueAsText or None,
-            hec_flow_paths=parameters[17].valueAsText or None,
-            hec_cross_sections=parameters[18].valueAsText or None,
-            hec_hydraulic_structures=parameters[19].valueAsText or None,
+            hec_flow_paths=parameters[15].valueAsText or None,
+            hec_hydraulic_structures=parameters[16].valueAsText or None,
         )
         arcpy.AddMessage(f"Complete workflow outputs: {result.project_root}")
         if bool(parameters[14].value):
@@ -306,7 +268,9 @@ class ScreenRoadsCrossings:
             ("Known Culverts (Optional)", "culverts", "GPFeatureLayer", "Optional"),
             ("Known Structure Search Distance (REVIEW REQUIRED)", "search_distance", "GPLinearUnit", "Optional"),
         ]
-        return [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
+        parameters = [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
+        parameters[9].filter.list = ["json"]
+        return parameters
     def isLicensed(self): return arcpy.ProductInfo() not in {"NotInitialized", "Unavailable"}
     def updateParameters(self, parameters): return
     def updateMessages(self, parameters):
@@ -334,16 +298,11 @@ class PrepareHecRasPackage:
             ("Road and Crossing Locations", "crossings", "GPFeatureLayer", "Optional"),
             ("Land Cover / Roughness Source", "land_cover", "GPString", "Optional"),
             ("Structure Review / No-Structure Confirmation", "hec_hydraulic_structures_review", "GPString", "Optional"),
-            ("Engineer Terrain Approval Notes", "hec_terrain_approval", "GPString", "Optional"),
-            ("Manning's n / Roughness Notes", "hec_mannings_n", "GPString", "Optional"),
-            ("Flow/Hydrology Boundary Conditions", "hec_flow_boundary_conditions", "GPString", "Optional"),
-            ("Downstream Boundary Condition or Normal Slope", "hec_downstream_boundary_condition", "GPString", "Optional"),
-            ("Geometry Review Notes", "hec_geometry_review_notes", "GPString", "Optional"),
-            ("HEC-RAS Plan/Geometry File Notes", "hec_model_plan_geometry", "GPString", "Optional"),
-            ("Calibration/Reasonableness Notes", "hec_calibration_reasonableness", "GPString", "Optional"),
-            ("Engineer/Reviewer Name", "hec_reviewer_name", "GPString", "Optional"),
+            ("Approved Engineering Lookup JSON (optional; Manning's n/CN/infiltration)", "engineering_lookup", "DEFile", "Optional"),
         ]
-        return [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
+        parameters = [arcpy.Parameter(displayName=d, name=n, datatype=t, parameterType=r, direction="Input") for d,n,t,r in specs]
+        parameters[9].filter.list = ["json"]
+        return parameters
     def isLicensed(self): return arcpy.ProductInfo() not in {"NotInitialized", "Unavailable"}
     def updateParameters(self, parameters): return
     def updateMessages(self, parameters): return
@@ -352,14 +311,7 @@ class PrepareHecRasPackage:
         layers = {name: parameters[index + 2].valueAsText or None for index, name in enumerate(names)}
         engineer_inputs = {
             "hydraulic_structures_review": parameters[8].valueAsText,
-            "approved_terrain": parameters[9].valueAsText,
-            "roughness_values": parameters[10].valueAsText,
-            "flow_boundary_conditions": parameters[11].valueAsText,
-            "downstream_boundary_condition": parameters[12].valueAsText,
-            "geometry_review_notes": parameters[13].valueAsText,
-            "model_plan_geometry": parameters[14].valueAsText,
-            "calibration_or_reasonableness": parameters[15].valueAsText,
-            "reviewer_name": parameters[16].valueAsText,
+            "engineering_lookup": parameters[9].valueAsText,
         }
         result = build_hec_ras_review_package(
             Path(parameters[0].valueAsText), parameters[1].valueAsText, arcpy, layers, engineer_inputs=engineer_inputs
@@ -465,10 +417,10 @@ class ValidateStandardizeData:
 
 
 class DownloadAuthoritativeData:
-    """Download all or selected rows from the editable authoritative-source catalog."""
+    """Download/stage all or selected rows from the editable source catalog."""
 
     def __init__(self):
-        self.label = "Download Authoritative Data"
+        self.label = "Download/Stage Catalog Data"
         self.description = "Acquire configured vector and image services for the validated site boundary."
         self.category = "02 - Data Acquisition"
         self.canRunInBackground = False
@@ -479,7 +431,7 @@ class DownloadAuthoritativeData:
             datatype="DEFolder", parameterType="Required", direction="Input",
         )
         catalog = arcpy.Parameter(
-            displayName="Authoritative Source Catalog", name="source_catalog",
+            displayName="Reviewed Source Catalog", name="source_catalog",
             datatype="DEFile", parameterType="Required", direction="Input",
         )
         catalog.value = str(REPOSITORY_ROOT / "config" / "authoritative_sources.yaml")
