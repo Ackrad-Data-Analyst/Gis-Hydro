@@ -1,0 +1,125 @@
+{
+  "catalog_notice": "Manager-provided starting catalog. Service availability, licensing, schemas, filters, resolution, and engineering suitability require validation before production use.",
+  "sources": [
+    {
+      "name": "NLCD_Land_Cover",
+      "category": "Land cover",
+      "source_agency": "USGS",
+      "source_type": "image_service",
+      "item_id": "32e2ccc6416746a9a72b4d216813f84f",
+      "rest_url": "https://di-nlcd.img.arcgis.com/arcgis/rest/services/USA_NLCD_Annual_LandCover/ImageServer",
+      "authentication": "none",
+      "operation": "extract",
+      "filter": "Year=2024",
+      "resampling": "NEAREST"
+    },
+    {
+      "name": "FEMA_100_Year_SFHA",
+      "category": "FEMA flood information",
+      "source_agency": "FEMA",
+      "source_type": "map_service_layer",
+      "item_id": "",
+      "rest_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28",
+      "authentication": "none",
+      "operation": "spatial_query_clip",
+      "filter": "FLD_ZONE IN ('A','AE','AH','AO','A99','AR','V','VE')",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "FEMA_500_Year_Zone_X",
+      "category": "FEMA flood information",
+      "source_agency": "FEMA",
+      "source_type": "map_service_layer",
+      "item_id": "",
+      "rest_url": "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28",
+      "authentication": "none",
+      "operation": "spatial_query_clip",
+      "filter": "FLD_ZONE = 'X' AND (ZONE_SUBTY LIKE '0.2 PCT ANNUAL CHANCE FLOOD HAZARD%' OR ZONE_SUBTY LIKE '0.2PCT ANNUAL CHANCE FLOOD HAZARD%')",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "USGS_HUC12_Subwatersheds",
+      "category": "Watersheds",
+      "source_agency": "USGS",
+      "source_type": "map_service_layer",
+      "item_id": "",
+      "rest_url": "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/6",
+      "authentication": "none",
+      "operation": "select_intersecting_copy",
+      "filter": "1=1",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "USGS_NHDPlus_HR",
+      "category": "Streams",
+      "source_agency": "USGS",
+      "source_type": "feature_service",
+      "item_id": "",
+      "rest_url": "https://services5.arcgis.com/7weheFjxuNkGGiZi/arcgis/rest/services/National_Hydrography_Dataset_Plus_High_Resolution/FeatureServer",
+      "authentication": "none",
+      "operation": "select_intersecting_copy",
+      "filter": "1=1",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "ESRI_Transportation_Roads_Railroads",
+      "category": "Roads and railroads",
+      "source_agency": "ESRI Federal Data",
+      "source_type": "feature_service",
+      "item_id": "",
+      "rest_url": "https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/Transportation_v1/FeatureServer",
+      "authentication": "none",
+      "operation": "select_intersecting_copy",
+      "filter": "1=1",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "SSURGO_Hydrologic_Group",
+      "category": "Hydrologic Soil Groups",
+      "source_agency": "USDA NRCS",
+      "source_type": "portal_image",
+      "item_id": "be2124509b064754875b8f0d6176cc4c",
+      "rest_url": "https://landscape11.arcgis.com/arcgis/rest/services/USA_Soils_Hydrologic_Group/ImageServer",
+      "authentication": "arcgis_org",
+      "operation": "extract",
+      "filter": "",
+      "resampling": "NEAREST"
+    },
+    {
+      "name": "SSURGO_Map_Units",
+      "category": "Soils",
+      "source_agency": "USDA NRCS",
+      "source_type": "portal_feature",
+      "item_id": "06e5fd61bdb6453fb16534c676e1c9b9",
+      "rest_url": "https://landscape11.arcgis.com/arcgis/rest/services/USA_Soils_Map_Units/FeatureServer/0",
+      "authentication": "arcgis_org",
+      "operation": "spatial_query_clip",
+      "filter": "",
+      "resampling": "VECTOR"
+    },
+    {
+      "name": "USGS_3DEP_DEM",
+      "category": "DEM",
+      "source_agency": "USGS",
+      "source_type": "image_service",
+      "item_id": "",
+      "rest_url": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+      "authentication": "none",
+      "operation": "extract",
+      "filter": "",
+      "resampling": "BILINEAR"
+    },
+    {
+      "name": "NOAA_Atlas_14_Precipitation",
+      "category": "Rainfall and storm temporal distribution",
+      "source_agency": "NOAA National Weather Service",
+      "source_type": "reference_web",
+      "item_id": "",
+      "rest_url": "https://hdsc.nws.noaa.gov/pfds/",
+      "authentication": "none",
+      "operation": "reference_only",
+      "filter": "Project centroid or reviewed location; engineer selects precipitation frequency/depth and temporal distribution.",
+      "resampling": "REFERENCE_ONLY"
+    }
+  ]
+}
