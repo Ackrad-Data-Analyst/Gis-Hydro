@@ -78,6 +78,10 @@ Do not rerun a completed stage over existing outputs.
 8. **06 - Prepare Preliminary HEC-RAS Review Package:** export terrain and available vector
    candidates. Missing banks, cross sections, structures, rainfall, infiltration, or
    boundary conditions remain explicitly listed; they are not invented.
+   The package writes `qa_qc/hec_ras_readiness_report.json`; it must read
+   `NOT_RUNNABLE_HEC_RAS_MODEL` until Civil Engineering supplies and approves the missing
+   HEC-RAS geometry, roughness, hydrology, boundary-condition, structure, calibration, and
+   reviewer-signoff inputs. Treat this report as a gate, not as a hidden failure.
 9. **07 - Generate QA/QC Package:** retain the JSON and CSV index with the project.
 
 ## Engineer/GIS inputs that remain explicit

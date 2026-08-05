@@ -24,6 +24,10 @@
 - Made hydrologic response-unit combination fail safely as a REVIEW REQUIRED note when
   optional land-cover/soil rasters cannot be combined, and made repeated HEC review-package
   exports create a new suffixed output folder instead of overwriting or stopping a rerun.
+- Added an explicit HEC-RAS readiness report and manifest fields that classify the package as
+  `NOT_RUNNABLE_HEC_RAS_MODEL` until required engineering inputs such as bank lines, cross
+  sections, flow paths, structures, Manning values, flow/boundary conditions, and reviewer
+  signoff are supplied.
 
 ## 0.3.4 - 2026-08-04
 

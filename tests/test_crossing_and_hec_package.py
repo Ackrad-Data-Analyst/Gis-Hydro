@@ -68,7 +68,13 @@ class CrossingAndHecTests(unittest.TestCase):
             self.assertTrue(Path(result.terrain).is_file())
             self.assertTrue(Path(result.projection_file).is_file())
             self.assertIn("bank_lines", result.missing_optional_inputs)
-            self.assertIn("not invented", result.review_notes)
+            self.assertIn("not a runnable HEC-RAS model", result.review_notes)
+            self.assertEqual(result.ras_readiness, "NOT_RUNNABLE_HEC_RAS_MODEL")
+            readiness = json.loads(Path(result.readiness_report).read_text(encoding="utf-8"))
+            self.assertEqual(readiness["ras_readiness"], "NOT_RUNNABLE_HEC_RAS_MODEL")
+            self.assertIn("cross_sections", readiness["missing_required_model_inputs"])
+            self.assertIn("roughness_values", readiness["missing_required_model_inputs"])
+            self.assertIn("not sufficient for final hydraulic modeling", readiness["package_purpose"])
             json_path, csv_path = generate_qa_package(root)
             self.assertTrue(json_path.is_file()); self.assertTrue(csv_path.is_file())
 
@@ -81,6 +87,8 @@ class CrossingAndHecTests(unittest.TestCase):
             self.assertTrue((Path(result.package_root) / "rasters" / "land_cover.tif").is_file())
             self.assertIn("land_cover", result.copied_layers)
             self.assertIn("land_cover_vector_export_review_required", result.missing_optional_inputs)
+            readiness = json.loads(Path(result.readiness_report).read_text(encoding="utf-8"))
+            self.assertIn("land_cover", readiness["available_review_inputs"])
 
     def test_hec_review_package_uses_new_folder_when_previous_package_exists(self):
         with tempfile.TemporaryDirectory() as temp:

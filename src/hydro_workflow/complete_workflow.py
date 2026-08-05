@@ -34,6 +34,7 @@ class CompleteWorkflowResult:
     completed_at: str
     status: str
     review_notes: str
+    hec_ras_readiness: str
     def to_dict(self) -> dict[str, object]: return asdict(self)
 
 
@@ -211,6 +212,7 @@ def run_complete_workflow(
         str(qa_json), datetime.now(timezone.utc).isoformat(), "REVIEW",
         ("REVIEW REQUIRED: preliminary screening workflow; not final engineering approval "
          "or a runnable HEC-RAS model." + optional_note + response_note),
+        getattr(hec, "ras_readiness", "NOT_RUNNABLE_HEC_RAS_MODEL"),
     )
     (root / "qa_qc" / "complete_workflow_report.json").write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
