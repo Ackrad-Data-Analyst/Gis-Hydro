@@ -24,6 +24,17 @@ class HecRasPackageResult:
     def to_dict(self) -> dict[str, object]: return asdict(self)
 
 
+
+def _available_package_root(base: Path) -> Path:
+    """Return a new review-package folder without overwriting a previous run."""
+    if not base.exists():
+        return base
+    for index in range(2, 1000):
+        candidate = base.with_name(f"{base.name}_{index}")
+        if not candidate.exists():
+            return candidate
+    raise FileExistsError(f"No available HEC-RAS review package folder beside: {base}")
+
 def _hash(path: Path) -> str:
     digest = hashlib.sha256(path.read_bytes())
     return digest.hexdigest()
@@ -38,8 +49,7 @@ def build_hec_ras_review_package(
     """Export supplied candidates and provenance; never create final model geometry."""
     if not arcpy_adapter.Exists(terrain): raise ValueError(f"Terrain is missing: {terrain}")
     root = project_root.expanduser().resolve()
-    package = root / "hec_ras_inputs" / "preliminary_review_package"
-    if package.exists(): raise FileExistsError(f"HEC-RAS review package exists: {package}")
+    package = _available_package_root(root / "hec_ras_inputs" / "preliminary_review_package")
     for folder in ("terrain", "vectors", "rasters", "rainfall", "infiltration", "boundary_conditions", "qa_qc"):
         (package / folder).mkdir(parents=True, exist_ok=False)
 

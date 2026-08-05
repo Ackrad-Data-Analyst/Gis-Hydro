@@ -153,13 +153,32 @@ def run_complete_workflow(
             encoding="utf-8",
         )
     response_units = None
+    response_note = ""
     if land_cover_source_name and soil_group_source_name:
         land_cover_dataset = by_name.get(land_cover_source_name)
         soil_group_dataset = by_name.get(soil_group_source_name)
         if land_cover_dataset and soil_group_dataset:
-            response_units = combine_land_cover_soils(
-                root, land_cover_dataset, soil_group_dataset, arcpy_adapter
-            ).combined_raster
+            try:
+                response_units = combine_land_cover_soils(
+                    root, land_cover_dataset, soil_group_dataset, arcpy_adapter
+                ).combined_raster
+            except Exception as error:
+                response_note = (
+                    " Hydrologic response unit combination was skipped and marked REVIEW REQUIRED: "
+                    + " ".join(str(error).split())[:300]
+                    + "."
+                )
+                (root / "qa_qc" / "hydrologic_response_report.json").write_text(
+                    json.dumps({
+                        "processed_at": datetime.now(timezone.utc).isoformat(),
+                        "status": "REVIEW",
+                        "land_cover": land_cover_dataset,
+                        "soil_groups": soil_group_dataset,
+                        "combined_raster": None,
+                        "review_notes": response_note.strip(),
+                    }, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
+                )
     hec = build_hec_ras_review_package(
         root, terrain.filled_dem or by_name[dem_source_name], arcpy_adapter,
         {
@@ -191,7 +210,7 @@ def run_complete_workflow(
         str(crossings_report), hec.package_root,
         str(qa_json), datetime.now(timezone.utc).isoformat(), "REVIEW",
         ("REVIEW REQUIRED: preliminary screening workflow; not final engineering approval "
-         "or a runnable HEC-RAS model." + optional_note),
+         "or a runnable HEC-RAS model." + optional_note + response_note),
     )
     (root / "qa_qc" / "complete_workflow_report.json").write_text(
         json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8"

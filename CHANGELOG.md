@@ -21,6 +21,9 @@
   response units, are copied as raster snapshots instead of being forced through GeoJSON
   feature export. Raster/vector export fallbacks are recorded as REVIEW REQUIRED instead
   of crashing the manager demonstration.
+- Made hydrologic response-unit combination fail safely as a REVIEW REQUIRED note when
+  optional land-cover/soil rasters cannot be combined, and made repeated HEC review-package
+  exports create a new suffixed output folder instead of overwriting or stopping a rerun.
 
 ## 0.3.4 - 2026-08-04
 

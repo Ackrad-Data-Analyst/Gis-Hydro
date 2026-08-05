@@ -82,5 +82,13 @@ class CrossingAndHecTests(unittest.TestCase):
             self.assertIn("land_cover", result.copied_layers)
             self.assertIn("land_cover_vector_export_review_required", result.missing_optional_inputs)
 
+    def test_hec_review_package_uses_new_folder_when_previous_package_exists(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; _project(root)
+            first = build_hec_ras_review_package(root, "terrain", _ArcPy(), {})
+            second = build_hec_ras_review_package(root, "terrain", _ArcPy(), {})
+            self.assertNotEqual(first.package_root, second.package_root)
+            self.assertTrue(second.package_root.endswith("preliminary_review_package_2"))
+
 
 if __name__ == "__main__": unittest.main()
