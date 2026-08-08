@@ -6,12 +6,45 @@ registration, and data-gap screening**. It does not perform engineering analysis
 produce approved hydrology conclusions. Every configured rule is a draft requiring
 Civil Engineering review.
 
+## Download and run the ArcGIS tool
+
+There is no installer and no Python package setup is required for the ArcGIS toolbox.
+Download the complete repository ZIP rather than saving the `.pyt` file by itself:
+
+1. On the GitHub repository page, select **Code > Download ZIP**. If you are reviewing a
+   pull request, select the PR's **Code** tab first so the ZIP contains that version.
+2. In Windows File Explorer, right-click the downloaded ZIP, select **Extract All**, and
+   move the extracted `Gis-Hydro` folder to a permanent location such as
+   `C:\Users\<you>\Documents\Gis-Hydro`.
+3. Do **not** run anything while browsing inside the ZIP. Open the extracted folder and
+   double-click `tools\Open Site Hydrology Toolbox.cmd`.
+4. In ArcGIS Pro, open or create a **Map** project. If the toolbox is not already visible,
+   use **View > Catalog Pane**, right-click **Folders**, select **Add Folder Connection**,
+   and choose the extracted `Gis-Hydro` folder.
+5. Expand `toolboxes\site_hydrology_workflow.pyt` and run **Preflight Environment Check**.
+   Choose an output folder outside the downloaded code folder.
+6. Confirm the preflight report shows `terrain_hydrology=AVAILABLE`. ArcGIS Pro Advanced
+   does not by itself include Spatial Analyst; that extension must also be assigned.
+7. Open **00 - START HERE > Automated Site Workflow - KMZ to Review Package**. Select a
+   project name, a parent projects folder, the KML/KMZ boundary and polygon, an approved
+   CRS, units, data-source mode, and reviewed terrain parameters. Then run it once.
+8. Review the new project's `qa_qc` reports and `hec_ras_inputs` review package. The output
+   is preliminary and is not final engineering approval or a runnable HEC-RAS model.
+
+If the launcher cannot find ArcGIS Pro, start ArcGIS Pro normally and follow step 4. If
+the toolbox shows a red exclamation mark, right-click it, select **Refresh Python Toolbox
+Access Permission**, and then **Refresh**. For screenshots and field-by-field guidance,
+see [`docs/manager_quick_start.md`](docs/manager_quick_start.md) and
+[`docs/user_guide.md`](docs/user_guide.md).
+
 ## Safety first
 
 - Use synthetic data for tests. Do not place company data in this repository.
 - Source files are opened only for reading and are hashed before and after a run.
 - Outputs must be outside the folder being inventoried.
-- The application has no network, cloud, ArcPy, terrain, or HEC-RAS automation.
+- The command-line inventory is read-only and performs no network activity. The ArcGIS
+  toolbox can acquire configured authoritative services and create preliminary terrain
+  and HEC-RAS review inputs; it does not run HEC-RAS or approve engineering results.
 
 ## Requirements and installation
 

@@ -152,14 +152,13 @@ def run_complete_workflow(
             }, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-    response_units = None
     if land_cover_source_name and soil_group_source_name:
         land_cover_dataset = by_name.get(land_cover_source_name)
         soil_group_dataset = by_name.get(soil_group_source_name)
         if land_cover_dataset and soil_group_dataset:
-            response_units = combine_land_cover_soils(
+            combine_land_cover_soils(
                 root, land_cover_dataset, soil_group_dataset, arcpy_adapter
-            ).combined_raster
+            )
     hec = build_hec_ras_review_package(
         root, terrain.filled_dem or by_name[dem_source_name], arcpy_adapter,
         {
@@ -168,7 +167,6 @@ def run_complete_workflow(
             "flow_paths": terrain.drainage_paths,
             "cross_sections": None,
             "crossings": crossings_output,
-            "land_cover": response_units or (by_name.get(land_cover_source_name) if land_cover_source_name else None),
         },
     )
     qa_json, _ = generate_qa_package(root)
