@@ -3,6 +3,19 @@ from pathlib import Path
 
 
 class ManagerHandoffTests(unittest.TestCase):
+    def test_readme_gives_direct_download_and_one_run_instructions(self):
+        root = Path(__file__).parents[1]
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        for instruction in (
+            "Code > Download ZIP",
+            "Extract All",
+            "tools\\Open Site Hydrology Toolbox.cmd",
+            "Preflight Environment Check",
+            "Automated Site Workflow - KMZ to Review Package",
+            "terrain_hydrology=AVAILABLE",
+        ):
+            self.assertIn(instruction, readme)
+
     def test_quick_start_assets_and_launcher_are_present(self):
         root = Path(__file__).parents[1]
         guide = (root / "docs" / "manager_quick_start.md").read_text(encoding="utf-8")

@@ -10,6 +10,42 @@ from hydro_workflow.complete_workflow import run_complete_workflow
 class CompleteWorkflowTests(unittest.TestCase):
     @patch("hydro_workflow.complete_workflow.generate_qa_package")
     @patch("hydro_workflow.complete_workflow.build_hec_ras_review_package")
+    @patch("hydro_workflow.complete_workflow.combine_land_cover_soils")
+    @patch("hydro_workflow.complete_workflow.prepare_terrain_hydrology")
+    @patch("hydro_workflow.complete_workflow.validate_standardize_data")
+    @patch("hydro_workflow.complete_workflow.acquire_catalog_sources")
+    @patch("hydro_workflow.complete_workflow.import_and_validate_boundary")
+    @patch("hydro_workflow.complete_workflow.create_project_workspace")
+    def test_raster_response_units_are_not_exported_as_hec_vector_layers(
+        self, create, boundary, acquire, standardize, terrain, combine, hec, qa
+    ):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "site"; (root / "qa_qc").mkdir(parents=True)
+            create.return_value = types.SimpleNamespace(project_root=str(root))
+            boundary.return_value = types.SimpleNamespace(imported_boundary="boundary")
+            acquire.return_value = []
+            standardize.return_value = [
+                types.SimpleNamespace(source_name="DEM", standardized_dataset="dem", status="REVIEW"),
+                types.SimpleNamespace(source_name="Land", standardized_dataset="land_raster", status="REVIEW"),
+                types.SimpleNamespace(source_name="Soils", standardized_dataset="soil_raster", status="REVIEW"),
+            ]
+            terrain.return_value = types.SimpleNamespace(filled_dem="filled", drainage_paths="streams")
+            combine.return_value = types.SimpleNamespace(combined_raster="response_units_raster")
+            hec.return_value = types.SimpleNamespace(package_root="hec_package")
+            qa.return_value = (root / "qa.json", root / "qa.csv")
+
+            run_complete_workflow(
+                "Site", Path(temp), "source_boundary", "crs", [], "DEM", "Roads", 500,
+                True, object(), land_cover_source_name="Land", soil_group_source_name="Soils"
+            )
+
+            combine.assert_called_once()
+            layers = hec.call_args.args[3]
+            self.assertNotIn("land_cover", layers)
+            self.assertNotIn("response_units_raster", layers.values())
+
+    @patch("hydro_workflow.complete_workflow.generate_qa_package")
+    @patch("hydro_workflow.complete_workflow.build_hec_ras_review_package")
     @patch("hydro_workflow.complete_workflow.screen_crossings")
     @patch("hydro_workflow.complete_workflow.prepare_terrain_hydrology")
     @patch("hydro_workflow.complete_workflow.validate_standardize_data")

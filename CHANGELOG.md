@@ -1,5 +1,9 @@
 # Changelog
 
+- Added direct GitHub ZIP download, extraction, ArcGIS connection, preflight, and
+  one-run workflow instructions at the top of the README, and corrected the outdated
+  statement that the ArcGIS toolbox had no acquisition or terrain processing.
+
 ## 0.3.5
 
 - Replaced the misleading toolbox-not-found message with direct **Extract All** instructions
